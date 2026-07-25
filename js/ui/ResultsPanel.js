@@ -6,37 +6,13 @@ class ResultsPanel {
         this.exportService = exportService;
 
         this.el = {
-            passwordCard: document.getElementById('passwordCard'),
-            passwordInput: document.getElementById('resultsPassword'),
-            passwordError: document.getElementById('passwordError'),
-            lockedContent: document.getElementById('resultsLocked'),
             resultsContent: document.getElementById('resultsContent'),
             classStats: document.getElementById('classStats')
         };
     }
 
     showPasswordPrompt(freshEvals = null) {
-        if (window.app && window.app.isTeacher) {
-            this.el.passwordCard.style.display = 'none';
-            this.el.lockedContent.style.display = 'block';
-            this.render(freshEvals);
-            return;
-        }
-        this.el.passwordCard.style.display = 'block';
-        this.el.lockedContent.style.display = 'none';
-        this.el.passwordInput.value = '';
-        this.el.passwordError.style.display = 'none';
-    }
-
-    verifyPassword() {
-        if (this.auth.unlockResults(this.el.passwordInput.value)) {
-            this.el.passwordCard.style.display = 'none';
-            this.el.lockedContent.style.display = 'block';
-            this.render();
-        } else {
-            this.el.passwordError.style.display = 'block';
-            this.el.passwordInput.value = '';
-        }
+        this.render(freshEvals);
     }
 
     render(freshEvals = null) {

@@ -56,6 +56,21 @@ class App {
                 document.getElementById('logoutBtn').style.display = '';
                 this._applyRoleVisibility();
                 this.dashboardPanel.render();
+            } else if (data.type === 'student' && data.name) {
+                this.currentVoter = data.name;
+                this.isTeacher = false;
+                const existing = this.voters.find(v => v.name.toLowerCase() === data.name.toLowerCase());
+                if (existing) {
+                    existing.loggedIn = true;
+                } else {
+                    this.voters.push({ name: data.name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                }
+                this.storage.saveVoters(this.voters);
+                this._findVoterGroup();
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = '';
+                this._applyRoleVisibility();
+                this.evaluationPanel.buildGrid();
             }
         } catch (e) {}
     }
@@ -63,31 +78,32 @@ class App {
     _setupLogin() {
         const overlay = document.getElementById('loginOverlay');
         const rolePicker = document.getElementById('loginRolePicker');
+        const nameInputDiv = document.getElementById('loginNameInput');
         const teacherPwDiv = document.getElementById('loginTeacherPw');
         const logoutBtn = document.getElementById('logoutBtn');
 
         const showRolePicker = () => {
             rolePicker.style.display = 'block';
+            nameInputDiv.style.display = 'none';
             teacherPwDiv.style.display = 'none';
+        };
+        const showNameInput = () => {
+            rolePicker.style.display = 'none';
+            nameInputDiv.style.display = 'block';
+            teacherPwDiv.style.display = 'none';
+            document.getElementById('voterNameInput').focus();
         };
         const showTeacherPw = () => {
             rolePicker.style.display = 'none';
+            nameInputDiv.style.display = 'none';
             teacherPwDiv.style.display = 'block';
             document.getElementById('teacherPasswordInput').focus();
-        };
-
-        const _getDeviceId = () => {
-            let id = localStorage.getItem('rubricDeviceId');
-            if (!id) {
-                id = 'Device_' + Math.random().toString(36).substring(2, 8);
-                localStorage.setItem('rubricDeviceId', id);
-            }
-            return id;
         };
 
         this._doLogout = () => {
             const wasVoter = this.currentVoter;
             localStorage.removeItem('rubricLoggedInUser');
+            localStorage.removeItem('rubricDeviceName');
             this.currentVoter = null;
             this.isTeacher = false;
             this.voterGroupIndex = null;
@@ -97,33 +113,68 @@ class App {
             }
             this.evaluations.clearAll();
             logoutBtn.style.display = 'none';
+            document.getElementById('voterNameInput').value = '';
             document.getElementById('teacherPasswordInput').value = '';
+            document.getElementById('loginError').style.display = 'none';
             document.getElementById('teacherLoginError').style.display = 'none';
             showRolePicker();
             overlay.style.display = 'flex';
         };
 
+        document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
+        document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
+        document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
+        document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
+
+        const _matchGroupMember = (raw) => {
+            const lower = raw.toLowerCase();
+            const all = this.groups.getAll();
+            for (let i = 0; i < all.length; i++) {
+                for (const m of this.groups.getMemberList(i)) {
+                    const ml = m.toLowerCase();
+                    if (ml === lower || ml.startsWith(lower + ' ') || ml.endsWith(' ' + lower)) return m;
+                }
+            }
+            return null;
+        };
+
         const studentLogin = async () => {
+            const raw = document.getElementById('voterNameInput').value.trim();
+            if (!raw) { document.getElementById('loginError').style.display = 'block'; return; }
+
             await this._freshSync();
-            const deviceId = _getDeviceId();
-            this.currentVoter = deviceId;
+
+            const matched = _matchGroupMember(raw);
+            if (!matched) {
+                document.getElementById('loginError').textContent = 'Your name is not listed in any group.';
+                document.getElementById('loginError').style.display = 'block';
+                return;
+            }
+            const existing = this.voters.find(v => v.name.toLowerCase() === matched.toLowerCase());
+            if (existing && existing.loggedIn) {
+                document.getElementById('loginError').textContent = 'This name is already taken on another device.';
+                document.getElementById('loginError').style.display = 'block';
+                return;
+            }
+            document.getElementById('loginError').style.display = 'none';
+            this.currentVoter = matched;
             this.isTeacher = false;
-            this.voterGroupIndex = null;
-            const existing = this.voters.find(v => v.name === deviceId);
+            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'student', name: matched }));
             if (!existing) {
-                this.voters.push({ name: deviceId, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                this.voters.push({ name: matched, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
             } else {
                 existing.loggedIn = true;
             }
             this.storage.saveVoters(this.voters);
+            this._findVoterGroup();
             overlay.style.display = 'none';
             logoutBtn.style.display = '';
             this._applyRoleVisibility();
             this._refreshStudentEvals();
         };
 
-        document.getElementById('chooseStudentBtn').addEventListener('click', studentLogin);
-        document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
+        document.getElementById('voterLoginBtn').addEventListener('click', studentLogin);
+        document.getElementById('voterNameInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') studentLogin(); });
 
         const teacherLogin = () => {
             const pw = document.getElementById('teacherPasswordInput').value;
@@ -140,8 +191,6 @@ class App {
 
         document.getElementById('teacherLoginBtn').addEventListener('click', teacherLogin);
         document.getElementById('teacherPasswordInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') teacherLogin(); });
-
-        document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
     }
 
     async _freshSync() {
@@ -304,15 +353,7 @@ class App {
             this.dashboardPanel.render();
         }
         if (tabId === 'setup') {
-            if (!this.isTeacher) {
-                document.getElementById('editRubricBtn').style.display = 'none';
-                document.getElementById('setupButtons').style.display = 'none';
-            } else {
-                document.getElementById('editRubricBtn').style.display = '';
-            }
-            this.auth.lockSetup();
-            this.setupPanel.hidePasswordPrompt();
-            this.setupPanel.disableEditing();
+            this.setupPanel.enableEditing();
             this.setupPanel.updatePreview();
         }
         if (tabId === 'groups') {
@@ -340,19 +381,14 @@ class App {
             const members = this.groups.getMemberList(i);
             members.forEach(m => {
                 if (!allMembers.has(m)) allMembers.set(m, []);
-                allMembers.get(m).push(i);
+                allMembers.get(m).push({ name: g.name, index: i });
             });
         });
         const votersMap = {};
         allEntries.forEach(e => {
-            if (!votersMap[e.voter]) votersMap[e.voter] = new Set();
-            votersMap[e.voter].add(e.groupIndex);
-        });
-        this.voters.forEach(v => {
-            if (v.ratedGroups && v.ratedGroups.length > 0) {
-                if (!votersMap[v.name]) votersMap[v.name] = new Set();
-                v.ratedGroups.forEach(gi => votersMap[v.name].add(gi));
-            }
+            if (!votersMap[e.voter]) votersMap[e.voter] = { count: 0, groups: [] };
+            votersMap[e.voter].count++;
+            votersMap[e.voter].groups.push(e.groupIndex);
         });
         const allNames = [...new Set([...allMembers.keys(), ...this.voters.map(v => v.name)])];
         allNames.sort();
@@ -360,23 +396,21 @@ class App {
             container.innerHTML = '<div class="empty-state"><p>No students found.</p></div>';
             return;
         }
-        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Status</th><th>Groups Rated</th><th>Group Names</th></tr>';
+        const totalGroups = this.groups.size();
+        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Group</th><th>Groups Rated</th><th>Status</th></tr>';
         allNames.forEach((name, i) => {
-            const ratedSet = votersMap[name] || new Set();
-            const votedGroups = [...ratedSet];
-            const hasVoted = votedGroups.length > 0;
-            const statusClass = hasVoted ? 'grade-A' : 'grade-D';
-            const statusText = hasVoted ? 'Voted' : 'Not yet';
-            const groupNames = votedGroups.map(gi => {
-                const g = this.groups.get(gi);
-                return g ? g.name : `Group ${gi + 1}`;
-            }).join(', ');
+            const voterData = votersMap[name];
+            const groupsRated = voterData ? voterData.count : 0;
+            const memberGroups = allMembers.get(name) || [];
+            const groupNames = memberGroups.map(g => g.name).join(', ');
+            const statusClass = groupsRated > 0 ? 'grade-A' : 'grade-D';
+            const statusText = groupsRated > 0 ? 'Voted' : 'Not yet';
             html += `<tr>
                 <td>${i + 1}</td>
                 <td><strong>${name}</strong></td>
-                <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
-                <td>${votedGroups.length} / ${this.groups.size()}</td>
                 <td style="font-size:11px;color:#64748b;">${groupNames || '&mdash;'}</td>
+                <td>${groupsRated} / ${totalGroups}</td>
+                <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
             </tr>`;
         });
         html += '</table></div>';
@@ -405,16 +439,9 @@ class App {
     }
 
     _setupGlobalListeners() {
-        document.getElementById('editRubricBtn').addEventListener('click', () => this.setupPanel.showPasswordPrompt());
-        document.getElementById('setupCancelBtn').addEventListener('click', () => this.setupPanel.hidePasswordPrompt());
-        document.getElementById('setupUnlockBtn').addEventListener('click', () => this.setupPanel._verifyPassword());
         document.getElementById('addCriteriaBtn').addEventListener('click', () => this.setupPanel.addCriteria());
         document.getElementById('saveRubricBtn').addEventListener('click', () => this.setupPanel.saveRubric());
 
-        document.getElementById('resultsPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.resultsPanel.verifyPassword();
-        });
-        document.getElementById('viewResultsBtn').addEventListener('click', () => this.resultsPanel.verifyPassword());
         document.getElementById('clearAllBtn').addEventListener('click', () => this.resultsPanel.clearAll());
         document.getElementById('exportAllBtn').addEventListener('click', () => this.resultsPanel.exportCSV());
 

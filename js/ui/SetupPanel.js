@@ -6,10 +6,6 @@ class SetupPanel {
         this.tabManager = tabManager;
 
         this.el = {
-            editBtn: document.getElementById('editRubricBtn'),
-            prompt: document.getElementById('setupEditPrompt'),
-            password: document.getElementById('setupPassword'),
-            passwordError: document.getElementById('setupPasswordError'),
             criteriaList: document.getElementById('criteriaList'),
             setupButtons: document.getElementById('setupButtons'),
             maxScore: document.getElementById('maxScore'),
@@ -21,9 +17,6 @@ class SetupPanel {
     }
 
     _bindEvents() {
-        this.el.password.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this._verifyPassword();
-        });
         this.el.criteriaList.addEventListener('click', (e) => {
             const removeBtn = e.target.closest('.remove-criteria');
             if (removeBtn) this._removeCriteria(removeBtn);
@@ -33,56 +26,20 @@ class SetupPanel {
         this.el.activityName.addEventListener('input', () => this.updatePreview());
     }
 
-    showPasswordPrompt() {
-        if (window.app && window.app.isTeacher) {
-            this._enableEditing();
-            return;
-        }
-        this.el.prompt.style.display = 'block';
-        this.el.password.focus();
+    loadRubricIntoUI() {
+        this.el.maxScore.value = this.rubric.maxScore;
+        this.el.activityName.value = this.rubric.activityName;
+        this._rebuildCriteriaRows();
+        this.enableEditing();
+        this.updatePreview();
     }
 
-    hidePasswordPrompt() {
-        this.el.prompt.style.display = 'none';
-        this.el.password.value = '';
-        this.el.passwordError.style.display = 'none';
-    }
-
-    _verifyPassword() {
-        if (this.auth.unlockSetup(this.el.password.value)) {
-            this.hidePasswordPrompt();
-            this._enableEditing();
-        } else {
-            this.el.passwordError.style.display = 'block';
-            this.el.password.value = '';
-        }
-    }
-
-    _enableEditing() {
+    enableEditing() {
         this.el.criteriaList.querySelectorAll('input').forEach(input => input.removeAttribute('readonly'));
         this.el.criteriaList.querySelectorAll('.remove-criteria').forEach(btn => btn.style.display = 'block');
         this.el.maxScore.removeAttribute('disabled');
         this.el.activityName.removeAttribute('readonly');
         this.el.setupButtons.style.display = 'block';
-        this.el.editBtn.textContent = 'Editing Unlocked';
-        this.el.editBtn.style.cssText = 'padding:2px 6px; font-size:9px; border:none; border-radius:4px; background:linear-gradient(135deg,#10b981,#059669); color:white; cursor:pointer; font-weight:600; white-space:nowrap; line-height:1.4;';
-    }
-
-    disableEditing() {
-        this.el.criteriaList.querySelectorAll('input').forEach(input => input.setAttribute('readonly', true));
-        this.el.criteriaList.querySelectorAll('.remove-criteria').forEach(btn => btn.style.display = 'none');
-        this.el.maxScore.setAttribute('disabled', true);
-        this.el.activityName.setAttribute('readonly', true);
-        this.el.setupButtons.style.display = 'none';
-        this.el.editBtn.textContent = 'Edit (Teacher Only)';
-        this.el.editBtn.style.background = '#3498db';
-    }
-
-    loadRubricIntoUI() {
-        this.el.maxScore.value = this.rubric.maxScore;
-        this.el.activityName.value = this.rubric.activityName;
-        this._rebuildCriteriaRows();
-        this.updatePreview();
     }
 
     _rebuildCriteriaRows() {
@@ -98,13 +55,13 @@ class SetupPanel {
         div.innerHTML = `
             <div class="form-group">
                 <label>Criterion Name</label>
-                <input type="text" class="criteria-name-input" value="${this._escapeHtml(name)}" readonly>
+                <input type="text" class="criteria-name-input" value="${this._escapeHtml(name)}">
             </div>
             <div class="form-group">
                 <label>Weight (%)</label>
-                <input type="number" class="criteria-weight" value="${weight}" min="0" max="100" readonly>
+                <input type="number" class="criteria-weight" value="${weight}" min="0" max="100">
             </div>
-            <button class="remove-criteria" title="Remove" style="display:none;">&times;</button>
+            <button class="remove-criteria" title="Remove">&times;</button>
         `;
         return div;
     }

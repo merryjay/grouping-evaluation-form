@@ -82,6 +82,44 @@ class DashboardPanel {
             html += `<div class="card"><div class="empty-state"><p>No evaluations yet. Students need to vote first.</p></div></div>`;
         }
 
+        const allMembers = new Map();
+        this.app.groups.getAll().forEach((g, i) => {
+            const members = this.app.groups.getMemberList(i);
+            members.forEach(m => {
+                if (!allMembers.has(m)) allMembers.set(m, []);
+                allMembers.get(m).push(g.name);
+            });
+        });
+
+        const votersMap = {};
+        entries.forEach(e => {
+            if (!votersMap[e.voter]) votersMap[e.voter] = { count: 0, groups: [] };
+            votersMap[e.voter].count++;
+            votersMap[e.voter].groups.push(e.groupIndex);
+        });
+
+        html += `<div class="card">
+            <h2>Voter Status</h2>
+            <div style="overflow-x:auto;">
+            <table class="results-table">
+                <tr><th>#</th><th>Name</th><th>Group</th><th>Groups Rated</th><th>Status</th></tr>`;
+        const allNames = [...new Set([...allMembers.keys()])].sort();
+        allNames.forEach((name, i) => {
+            const voterData = votersMap[name];
+            const groupsRated = voterData ? voterData.count : 0;
+            const groupNames = allMembers.get(name) || [];
+            const statusClass = groupsRated > 0 ? 'grade-A' : 'grade-D';
+            const statusText = groupsRated > 0 ? 'Voted' : 'Not yet';
+            html += `<tr>
+                <td>${i + 1}</td>
+                <td><strong>${name}</strong></td>
+                <td style="font-size:11px;color:#64748b;">${groupNames.join(', ')}</td>
+                <td>${groupsRated} / ${totalGroups}</td>
+                <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
+            </tr>`;
+        });
+        html += `</table></div></div>`;
+
         this.el.innerHTML = html;
     }
 }
