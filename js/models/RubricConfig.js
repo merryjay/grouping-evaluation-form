@@ -2,7 +2,18 @@ class RubricConfig {
     constructor() {
         this.activityName = 'Group Presentation Evaluation';
         this.maxScore = 4;
-        this.criteria = [];
+        this.criteria = [
+            { name: 'Content Accuracy', weight: 10 },
+            { name: 'Understanding of Topic', weight: 10 },
+            { name: 'Organization & Structure', weight: 10 },
+            { name: 'Delivery & Communication Skills', weight: 10 },
+            { name: 'Audience Engagement/Audience impact', weight: 10 },
+            { name: 'Visual Aids/Instructional Materials', weight: 10 },
+            { name: 'Professional Appearance/Attire', weight: 10 },
+            { name: 'Teamwork/Collaboration', weight: 10 },
+            { name: 'Time allocation: 30 mins', weight: 10 },
+            { name: 'Strategies: Enjoyable, uniqueness team name, gamify exercises', weight: 10 }
+        ];
         this.descriptors = this._buildDefaultDescriptors();
     }
 
@@ -69,7 +80,7 @@ class RubricConfig {
             'Delivery & Communication Skills': {
                 4: ['Difficult to hear or understand', 'Some issues with clarity or confidence', 'Generally clear and confident', 'Speaks clearly, confidently, and maintains audience attention']
             },
-            'Audience Engagement': {
+            'Audience Engagement/Audience impact': {
                 4: ['Little to no audience engagement', 'Limited audience interaction', 'Maintains audience interest most of the time', 'Actively engages audience through questions, examples, or interaction']
             },
             'Visual Aids/Instructional Materials': {
@@ -81,8 +92,11 @@ class RubricConfig {
             'Teamwork/Collaboration': {
                 4: ['Lack of teamwork and coordination', 'Uneven participation among members', 'Most members participate actively', 'All members contribute equally and work cohesively']
             },
-            'Time Allocation': {
+            'Time allocation: 30 mins': {
                 4: ['Extended 30 mins on discussion', 'Extended 10 mins on discussion', 'Extended 5 mins on lesson discussion', 'Ended the lessons on time']
+            },
+            'Strategies: Enjoyable, uniqueness team name, gamify exercises': {
+                4: ['Lacks enthusiasm and interest', 'Limited excitement or creativity', 'Mostly enjoyable with some creativity', 'Highly enjoyable, creative, and energetic presentation']
             }
         };
     }
