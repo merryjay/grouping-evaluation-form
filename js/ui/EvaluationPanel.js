@@ -22,12 +22,8 @@ class EvaluationPanel {
             this.el.grid.className = 'eval-list';
         }
 
-        if (this.rubric.criteria.length === 0) {
-            this.el.grid.innerHTML = '<div class="card empty-state"><p>Please set up your rubric first.</p></div>';
-            return;
-        }
-        if (this.groups.size() === 0) {
-            this.el.grid.innerHTML = '<div class="card empty-state"><p>Please add groups first.</p></div>';
+        if (this.rubric.criteria.length === 0 || this.groups.size() === 0) {
+            this.el.grid.innerHTML = '<div class="card empty-state" style="text-align:center; padding:60px 20px;"><div style="font-size:48px; margin-bottom:16px;">&#9203;</div><p style="font-size:18px; font-weight:600; color:#64748b;">Wait for evaluation</p><p style="font-size:13px; color:#94a3b8; margin-top:8px;">The teacher hasn&apos;t set up the evaluation yet. Please check back later.</p></div>';
             return;
         }
 

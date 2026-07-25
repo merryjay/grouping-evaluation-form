@@ -78,9 +78,28 @@ class App {
 
     _setupLogin() {
         const overlay = document.getElementById('loginOverlay');
-        const studentDiv = document.getElementById('studentLogin');
-        const teacherDiv = document.getElementById('teacherLogin');
+        const rolePicker = document.getElementById('loginRolePicker');
+        const nameInputDiv = document.getElementById('loginNameInput');
+        const teacherPwDiv = document.getElementById('loginTeacherPw');
         const logoutBtn = document.getElementById('logoutBtn');
+
+        const showRolePicker = () => {
+            rolePicker.style.display = 'block';
+            nameInputDiv.style.display = 'none';
+            teacherPwDiv.style.display = 'none';
+        };
+        const showNameInput = () => {
+            rolePicker.style.display = 'none';
+            nameInputDiv.style.display = 'block';
+            teacherPwDiv.style.display = 'none';
+            document.getElementById('voterNameInput').focus();
+        };
+        const showTeacherPw = () => {
+            rolePicker.style.display = 'none';
+            nameInputDiv.style.display = 'none';
+            teacherPwDiv.style.display = 'block';
+            document.getElementById('teacherPasswordInput').focus();
+        };
 
         this._doLogout = () => {
             const wasVoter = this.currentVoter;
@@ -99,15 +118,14 @@ class App {
             document.getElementById('teacherPasswordInput').value = '';
             document.getElementById('loginError').style.display = 'none';
             document.getElementById('teacherLoginError').style.display = 'none';
-            showStudent();
+            showRolePicker();
             overlay.style.display = 'flex';
         };
 
-        const showStudent = () => { studentDiv.style.display = 'block'; teacherDiv.style.display = 'none'; document.getElementById('voterNameInput').focus(); };
-        const showTeacher = () => { studentDiv.style.display = 'none'; teacherDiv.style.display = 'block'; document.getElementById('teacherPasswordInput').focus(); };
-
-        document.getElementById('showTeacherLoginBtn').addEventListener('click', showTeacher);
-        document.getElementById('showStudentLoginBtn').addEventListener('click', showStudent);
+        document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
+        document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
+        document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
+        document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
 
         const _matchGroupMember = (raw) => {
             const lower = raw.toLowerCase();

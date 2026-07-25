@@ -561,35 +561,40 @@
 <div class="bg-overlay"></div>
 
 <div id="loginOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);">
-  <div style="background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+  <div id="loginRolePicker" style="background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
     <div style="font-size:40px;margin-bottom:10px;">&#128203;</div>
-
-    <div id="studentLogin">
-      <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
-      <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name (first or last name) to start evaluating groups.</p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus>
-        <button id="voterLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
-      </div>
-      <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
-        <button id="showTeacherLoginBtn" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">Teacher? Click here to sign in</button>
-      </div>
+    <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:24px;">Who are you?</p>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <button id="chooseStudentBtn" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);transition:all 0.2s;">I'm a Student</button>
+      <button id="chooseTeacherBtn" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:all 0.2s;">I'm a Teacher</button>
     </div>
+  </div>
 
-    <div id="teacherLogin" style="display:none;">
-      <h2 style="margin:0 0 6px;color:#1e293b;">Teacher Access</h2>
-      <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter the teacher password to access all features.</p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;">
-        <button id="teacherLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
-      </div>
-      <p id="teacherLoginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Incorrect password.</p>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
-        <button id="showStudentLoginBtn" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">Student? Click here to sign in</button>
-      </div>
+  <div id="loginNameInput" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <h2 style="margin:0 0 6px;color:#1e293b;">Student Evaluation</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name to start evaluating groups.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus>
+      <button id="voterLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
     </div>
+    <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
+    <div style="margin-top:12px;">
+      <button id="backToRolePickerBtn" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+    </div>
+  </div>
 
+  <div id="loginTeacherPw" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <h2 style="margin:0 0 6px;color:#1e293b;">Teacher Access</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter the teacher password to access the dashboard.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;">
+      <button id="teacherLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
+    </div>
+    <p id="teacherLoginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Incorrect password.</p>
+    <div style="margin-top:12px;">
+      <button id="backToRolePickerBtn2" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+    </div>
   </div>
 </div>
 
