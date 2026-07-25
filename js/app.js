@@ -138,7 +138,7 @@ class App {
         };
 
         document.getElementById('teacherLoginBtn').addEventListener('click', teacherLogin);
-        document.getElementById('teacherPasswordInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') teacherLogin(); });
+        document.getElementById('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); teacherLogin(); } });
     }
 
     async _freshSync() {
