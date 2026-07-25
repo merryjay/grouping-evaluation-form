@@ -17,6 +17,7 @@ class App {
         this.resultsPanel.setStorage(this.storage);
         this.dashboardPanel = new DashboardPanel(this);
 
+        localStorage.removeItem('rubricLoggedInUser');
         this.currentVoter = null;
         this.voters = this.storage.loadVoters();
         this.isTeacher = false;
@@ -35,44 +36,12 @@ class App {
         this._setupLogin();
         this._setupTabListeners();
         this._setupGlobalListeners();
-        this._autoLogin();
 
         if (this.evaluations.size() > 0) {
             this.evaluationPanel.buildGrid();
         }
 
         this.rubric.activityName = document.getElementById('activityName').value;
-    }
-
-    _autoLogin() {
-        const saved = localStorage.getItem('rubricLoggedInUser');
-        if (!saved) return;
-        try {
-            const data = JSON.parse(saved);
-            if (data.type === 'teacher') {
-                this.isTeacher = true;
-                this.currentVoter = null;
-                document.getElementById('loginOverlay').style.display = 'none';
-                document.getElementById('logoutBtn').style.display = '';
-                this._applyRoleVisibility();
-                this.dashboardPanel.render();
-            } else if (data.type === 'student' && data.name) {
-                this.currentVoter = data.name;
-                this.isTeacher = false;
-                const existing = this.voters.find(v => v.name.toLowerCase() === data.name.toLowerCase());
-                if (existing) {
-                    existing.loggedIn = true;
-                } else {
-                    this.voters.push({ name: data.name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
-                }
-                this.storage.saveVoters(this.voters);
-                this._findVoterGroup();
-                document.getElementById('loginOverlay').style.display = 'none';
-                document.getElementById('logoutBtn').style.display = '';
-                this._applyRoleVisibility();
-                this.evaluationPanel.buildGrid();
-            }
-        } catch (e) {}
     }
 
     _setupLogin() {
@@ -123,6 +92,7 @@ class App {
             overlay.style.display = 'flex';
         };
 
+        logoutBtn.addEventListener('click', () => this._doLogout());
         document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
         document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
         document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
