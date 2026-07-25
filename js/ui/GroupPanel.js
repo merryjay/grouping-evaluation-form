@@ -116,23 +116,9 @@ class GroupPanel {
                 if (!toggle) return;
                 const index = parseInt(toggle.getAttribute('data-index'));
 
-                card.addEventListener('mouseenter', () => {
-                    card.classList.add('hover');
-                    const arrow = toggle.querySelector('.toggle-arrow');
-                    if (arrow) arrow.style.transform = 'rotate(180deg)';
-                });
-                card.addEventListener('mouseleave', () => {
-                    if (!card.classList.contains('open')) {
-                        card.classList.remove('hover');
-                        const arrow = toggle.querySelector('.toggle-arrow');
-                        if (arrow) arrow.style.transform = 'rotate(0deg)';
-                    }
-                });
-
                 toggle.addEventListener('click', (e) => {
                     const arrow = toggle.querySelector('.toggle-arrow');
                     const wasOpen = card.classList.contains('open');
-                    card.classList.remove('hover');
                     card.classList.toggle('open');
                     if (arrow) arrow.style.transform = wasOpen ? 'rotate(0deg)' : 'rotate(180deg)';
                     if (wasOpen) this._openGroups.delete(index);
