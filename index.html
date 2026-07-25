@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rubric Eval">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="description" content="Group rubric evaluation form with automatic score computation">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <title>GROUPINGS EVALUATION FORM</title>
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%233498db' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>R</text></svg>">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background-attachment: fixed;
+            color: #1e293b;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .bg-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('vsu-building.png') no-repeat center center;
+            background-size: cover;
+            opacity: 0.15;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 35px 30px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(102,126,234,0.4);
+        }
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: pulse 4s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            position: relative;
+            letter-spacing: -0.5px;
+        }
+        header p {
+            opacity: 0.9;
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            border: 1px solid rgba(0,0,0,0.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover {
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        }
+        .card.small { padding: 12px; }
+        .card h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+
+        .form-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 150px; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #475569;
+            letter-spacing: 0.3px;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #f8fafc;
+            font-family: inherit;
+            color: #1e293b;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102,126,234,0.15);
+        }
+        .form-group input[readonly], .form-group textarea[readonly] {
+            background: #f1f5f9;
+            color: #64748b;
+            cursor: default;
+        }
+        .form-group textarea { resize: vertical; min-height: 100px; }
+
+        .rubric-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 12px;
+            font-size: 14px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .rubric-table th {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            color: white;
+            padding: 14px 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .rubric-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+            background: white;
+        }
+        .rubric-table tr:last-child td { border-bottom: none; }
+        .rubric-table tr:hover td { background: #f8fafc; }
+        .rubric-table .criteria-name { font-weight: 600; color: #1e293b; min-width: 120px; }
+        .rubric-table .descriptor { color: #64748b; font-size: 11px; line-height: 1.4; }
+
+        .groups-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+        .eval-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .group-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.04);
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .group-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, rgba(102,126,234,0.1), transparent);
+            border-radius: 0 0 0 100%;
+            pointer-events: none;
+        }
+        .group-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        .group-card.evaluated { border-left-color: #10b981; }
+        .group-card.clickable { cursor: pointer; }
+        .group-card.clickable:hover { border-left-color: #764ba2; }
+        .group-members-body { display: none; }
+        .group-card.open .group-members-body { display: block; }
+
+        .group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .group-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            letter-spacing: -0.3px;
+        }
+        .group-score-badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        }
+
+        .members-list { margin-bottom: 16px; }
+        .members-list h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .member-name {
+            display: inline-block;
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin: 3px;
+            color: #475569;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .member-name:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .rating-section { border-top: 2px solid #f1f5f9; padding-top: 16px; margin-top: 8px; }
+        .rating-section h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .star-rating { display: flex; gap: 8px; margin-bottom: 12px; }
+        .star-btn {
+            width: 44px;
+            height: 44px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+        }
+        .star-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: scale(1.08);
+        }
+        .star-btn:active { transform: scale(0.95); }
+        .star-btn.selected {
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .star-btn.selected:nth-child(1) { background: linear-gradient(135deg, #ef4444, #dc2626); border-color: #ef4444; }
+        .star-btn.selected:nth-child(2) { background: linear-gradient(135deg, #f97316, #ea580c); border-color: #f97316; }
+        .star-btn.selected:nth-child(3) { background: linear-gradient(135deg, #eab308, #ca8a04); border-color: #eab308; }
+        .star-btn.selected:nth-child(4) { background: linear-gradient(135deg, #22c55e, #16a34a); border-color: #22c55e; }
+
+        .eval-toggle:hover { background: #f8fafc; border-radius: 12px; padding: 8px; margin: -8px; }
+        .eval-toggle-icon { font-size: 14px; color: #94a3b8; transition: transform 0.3s; }
+
+        .rating-label { font-size: 14px; color: #64748b; margin-top: 6px; font-weight: 600; }
+
+        .criteria-scores { margin-top: 12px; padding-top: 12px; border-top: 2px dashed #e2e8f0; }
+        .criteria-scores h4 { font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; font-weight: 600; }
+        .criteria-row-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; }
+        .criteria-row-item span:first-child { color: #64748b; }
+        .criteria-row-item span:last-child { font-weight: 700; color: #1e293b; }
+
+        .save-group-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 12px;
+            box-shadow: 0 4px 15px rgba(16,185,129,0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .save-group-btn:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16,185,129,0.5);
+        }
+        .save-group-btn:active { transform: translateY(0); }
+        .save-group-btn.saved { background: linear-gradient(135deg, #94a3b8, #64748b); }
+
+        .score-display { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+        .score-box {
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .score-box::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.2), transparent);
+        }
+        .score-box { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .score-box.green { background: linear-gradient(135deg, #10b981, #059669); }
+        .score-box.orange { background: linear-gradient(135deg, #f97316, #ea580c); }
+        .score-box.purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+        .score-box.blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .score-box .score-value { font-size: 32px; font-weight: 800; position: relative; }
+        .score-box .score-label { font-size: 11px; opacity: 0.9; margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; position: relative; }
+
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        }
+        .btn-primary:hover { box-shadow: 0 6px 20px rgba(102,126,234,0.5); transform: translateY(-2px); }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16,185,129,0.4);
+        }
+        .btn-success:hover { box-shadow: 0 6px 20px rgba(16,185,129,0.5); transform: translateY(-2px); }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239,68,68,0.4);
+        }
+        .btn-danger:hover { box-shadow: 0 6px 20px rgba(239,68,68,0.5); transform: translateY(-2px); }
+        .btn-secondary {
+            background: linear-gradient(135deg, #64748b, #475569);
+            color: white;
+            box-shadow: 0 4px 15px rgba(100,116,139,0.4);
+        }
+        .btn-secondary:hover { box-shadow: 0 6px 20px rgba(100,116,139,0.5); transform: translateY(-2px); }
+        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+
+        .results-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 12px;
+            font-size: 14px;
+            display: block;
+            overflow-x: auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .results-table th {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            color: white;
+            padding: 14px 12px;
+            text-align: left;
+            white-space: nowrap;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .results-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            white-space: nowrap;
+            background: white;
+        }
+        .results-table tr:hover td { background: #f8fafc; }
+        .results-table .rank-1 td { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+        .results-table .rank-2 td { background: linear-gradient(135deg, #f1f5f9, #e2e8f0); }
+        .results-table .rank-3 td { background: linear-gradient(135deg, #fee2e2, #fecaca); }
+
+        .grade-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 800;
+            font-size: 14px;
+            color: white;
+            display: inline-block;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        .grade-A { background: linear-gradient(135deg, #10b981, #059669); }
+        .grade-B { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .grade-C { background: linear-gradient(135deg, #f97316, #ea580c); }
+        .grade-D { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .grade-F { background: linear-gradient(135deg, #991b1b, #7f1d1d); }
+
+        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .empty-state p { margin-top: 10px; font-size: 14px; }
+
+        .criteria-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+        .criteria-row .form-group { flex: 1; }
+        .remove-criteria {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border: none;
+            width: 44px;
+            height: 48px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 20px;
+            flex-shrink: 0;
+            touch-action: manipulation;
+            box-shadow: 0 4px 10px rgba(239,68,68,0.3);
+            transition: all 0.2s ease;
+        }
+        .remove-criteria:hover { transform: scale(1.05); }
+
+        .group-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end; }
+        .group-edit-row .form-group { flex: 1; }
+        .remove-group-btn {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 44px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 18px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(239,68,68,0.3);
+            transition: all 0.2s ease;
+        }
+        .remove-group-btn:hover { transform: scale(1.05); }
+
+        .tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 6px;
+            background: #f1f5f9;
+            border-radius: 16px;
+        }
+        .tab {
+            padding: 14px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            transition: all 0.2s ease;
+            color: #64748b;
+        }
+        .tab:hover { background: rgba(255,255,255,0.6); color: #1e293b; }
+        .tab:active { transform: scale(0.97); }
+        .tab.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .scroll-hint { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 8px; font-style: italic; }
+
+        .locked-overlay { position: relative; }
+        .locked-overlay::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.3); pointer-events: none; border-radius: 16px; }
+
+        @media (min-width: 768px) {
+            .score-display { grid-template-columns: repeat(4, 1fr); }
+            .btn-group { flex-direction: row; flex-wrap: wrap; }
+            .btn { width: auto; flex: 1; min-width: 160px; }
+            .rubric-table { font-size: 13px; }
+            .rubric-table th { font-size: 14px; padding: 16px 14px; }
+            .rubric-table td { padding: 14px; }
+            .results-table { font-size: 13px; }
+            .results-table th, .results-table td { padding: 14px 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="bg-overlay"></div>
+
+<div id="loginOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);">
+  <div id="loginRolePicker" style="background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <div style="font-size:40px;margin-bottom:10px;">&#128203;</div>
+    <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:24px;">Who are you?</p>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <button id="chooseStudentBtn" onclick="showStudentLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
+      <button id="chooseTeacherBtn" onclick="showTeacherLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
+    </div>
+  </div>
+
+  <div id="loginNameInput" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <h2 style="margin:0 0 6px;color:#1e293b;">Student Evaluation</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name to start evaluating groups.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus>
+      <button id="voterLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
+    </div>
+    <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
+    <div style="margin-top:12px;">
+      <button id="backToRolePickerBtn" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+    </div>
+  </div>
+
+  <div id="loginTeacherPw" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <h2 style="margin:0 0 6px;color:#1e293b;">Teacher Access</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter the teacher password to access the dashboard.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;">
+      <button id="teacherLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
+    </div>
+    <p id="teacherLoginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Incorrect password.</p>
+    <div style="margin-top:12px;">
+      <button id="backToRolePickerBtn2" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+    <header>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="text-align:left;">
+                <h1 style="font-size:24px;margin:0;">GROUPINGS EVALUATION FORM</h1>
+                <p style="font-size:12px;margin:4px 0 0;opacity:0.8;">Rate groups on multiple criteria with automatic score computation</p>
+            </div>
+            <button id="logoutBtn" style="padding:6px 12px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;display:none;position:relative;z-index:2;">Logout</button>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="setup">Rubric Setup</button>
+        <button class="tab" data-tab="groups">Groups</button>
+        <button class="tab" data-tab="evaluate">Evaluate</button>
+        <button class="tab" data-tab="voters">Voters</button>
+        <button class="tab" data-tab="results">Results</button>
+    </div>
+
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard" class="tab-content">
+        <div id="dashboardContent"></div>
+    </div>
+
+    <!-- SETUP TAB -->
+    <div id="tab-setup" class="tab-content">
+        <div class="card" style="padding:16px;">
+            <h2 style="margin:0 0 12px; border:none; padding:0; font-size:15px;">Rubric Configuration</h2>
+
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Max Score Per Criterion</label>
+                    <select id="maxScore">
+                        <option value="4" selected>4 points</option>
+                        <option value="5">5 points</option>
+                        <option value="3">3 points</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Assignment/Activity Name</label>
+                    <input type="text" id="activityName" placeholder="e.g. Group Presentation" value="Group Presentation Evaluation">
+                </div>
+            </div>
+
+            <h2 style="margin-top:10px; font-size:14px;">Criteria & Descriptors</h2>
+            <div id="criteriaList">
+                <div class="criteria-row" data-index="0" style="margin-bottom:6px;">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Content Accuracy">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="1">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Understanding of Topic">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="2">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Organization & Structure">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="3">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Delivery & Communication Skills">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="4">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Audience Engagement/Audience impact">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="5">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Visual Aids/Instructional Materials">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="6">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Professional Appearance/Attire">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="7">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Teamwork/Collaboration">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="8">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Time allocation: 30 mins">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+                <div class="criteria-row" data-index="9">
+                    <div class="form-group">
+                        <label>Criterion Name</label>
+                        <input type="text" class="criteria-name-input" value="Strategies: Enjoyable, uniqueness team name, gamify exercises">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (%)</label>
+                        <input type="number" class="criteria-weight" value="10" min="0" max="100">
+                    </div>
+                    <button class="remove-criteria" title="Remove">&times;</button>
+                </div>
+            </div>
+
+            <div id="setupButtons">
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="addCriteriaBtn">+ Add Criterion</button>
+                    <button class="btn btn-success" id="saveRubricBtn">Save Rubric</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Rubric Matrix Preview</h2>
+            <div class="scroll-hint">Swipe horizontally to see all columns</div>
+            <div id="rubricPreview" style="overflow-x: auto; -webkit-overflow-scrolling: touch;"></div>
+        </div>
+    </div>
+
+    <!-- GROUPS TAB -->
+    <div id="tab-groups" class="tab-content">
+        <div class="card">
+            <h2>Group Configuration</h2>
+            <p style="font-size:12px; color:#666; margin-bottom:15px;">Click a group to see its members. Use the add/delete buttons to manage groups.</p>
+            <div id="groupsListReadOnly"></div>
+            <div class="btn-group" style="margin-top:15px;">
+                <button class="btn btn-primary" id="addGroupBtn">+ Add Group</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EVALUATE TAB -->
+    <div id="tab-evaluate" class="tab-content">
+        <div class="card">
+            <h2 id="evaluationTitle">Group Evaluation</h2>
+            <p style="font-size:12px; color:#666; margin-bottom:15px;">Rate each group using the rubric. Click the score buttons to rate.</p>
+            <div class="scroll-hint">Scroll horizontally to see all criteria</div>
+        </div>
+        <div id="groupsEvaluationGrid" class="groups-grid"></div>
+
+    </div>
+
+    <!-- RESULTS TAB -->
+    <div id="tab-results" class="tab-content">
+        <div class="card">
+            <h2>Evaluation Results</h2>
+            <div id="resultsContent">
+                <div class="empty-state">
+                    <p>No evaluations yet. Go to the Evaluate tab to rate groups.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Class Statistics</h2>
+            <div id="classStats"></div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-danger" id="clearAllBtn">Clear All Results</button>
+            <button class="btn btn-secondary" id="exportAllBtn">Export All to CSV</button>
+        </div>
+    </div>
+
+    <!-- VOTERS TAB -->
+    <div id="tab-voters" class="tab-content">
+        <div class="card">
+            <h2>Voter Status</h2>
+            <div id="votersList">
+                <div class="empty-state"><p>No voters yet.</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/models/RubricConfig.js"></script>
+<script src="js/models/GroupCollection.js"></script>
+<script src="js/models/EvaluationCollection.js"></script>
+<script src="js/services/PocketBaseService.js"></script>
+<script src="js/services/StorageService.js"></script>
+<script src="js/services/AuthService.js"></script>
+<script src="js/services/ScoringService.js"></script>
+<script src="js/services/ExportService.js"></script>
+<script src="js/ui/TabManager.js"></script>
+<script src="js/ui/GroupNavigator.js"></script>
+<script src="js/ui/DashboardPanel.js"></script>
+<script src="js/ui/SetupPanel.js"></script>
+<script src="js/ui/GroupPanel.js"></script>
+<script src="js/ui/EvaluationPanel.js"></script>
+<script src="js/ui/ResultsPanel.js"></script>
+<script>
+function showStudentLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', true); showElem('loginTeacherPw', false); var inp = document.getElementById('voterNameInput'); if(inp) inp.focus(); }
+function showTeacherLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', false); showElem('loginTeacherPw', true); var inp = document.getElementById('teacherPasswordInput'); if(inp) inp.focus(); }
+function showElem(id, show) { var el = document.getElementById(id); if(el) el.style.display = show ? 'block' : 'none'; }
+function logoutUser() {
+    localStorage.removeItem('rubricLoggedInUser');
+    localStorage.removeItem('rubricDeviceName');
+    var app = window.app;
+    if (app) {
+        var currentName = app.currentVoter;
+        app.currentVoter = null;
+        app.isTeacher = false;
+        app.voterGroupIndex = null;
+        if (currentName && app.voters) {
+            app.voters = app.voters.map(function(v) {
+                if (v.name === currentName) v.loggedIn = false;
+                return v;
+            });
+            if (app.storage) app.storage.saveVoters(app.voters);
+        }
+    }
+    var overlay = document.getElementById('loginOverlay');
+    var studentDiv = document.getElementById('studentLogin');
+    var teacherDiv = document.getElementById('teacherLogin');
+    if (overlay) overlay.style.display = 'flex';
+    if (studentDiv) studentDiv.style.display = 'block';
+    if (teacherDiv) teacherDiv.style.display = 'none';
+    var logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) logoutBtn.style.display = 'none';
+    var nameInput = document.getElementById('voterNameInput');
+    if (nameInput) { nameInput.value = ''; nameInput.focus(); }
+    var pwInput = document.getElementById('teacherPasswordInput');
+    if (pwInput) pwInput.value = '';
+    var loginErr = document.getElementById('loginError');
+    if (loginErr) loginErr.style.display = 'none';
+    var teacherErr = document.getElementById('teacherLoginError');
+    if (teacherErr) teacherErr.style.display = 'none';
+    var tabs = document.querySelectorAll('.tab');
+    tabs.forEach(function(t) { t.style.display = ''; });
+    if (app) app.tabManager.switch('setup');
+}
+</script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

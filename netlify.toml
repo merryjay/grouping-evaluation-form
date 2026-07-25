@@ -3,10 +3,10 @@
 
 [[redirects]]
   from = "/"
-  to = "/rubric-evaluation.html"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
   from = "/*"
-  to = "/rubric-evaluation.html"
+  to = "/index.html"
   status = 200
