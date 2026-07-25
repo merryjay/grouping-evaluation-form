@@ -5,31 +5,38 @@ class StorageService {
     }
 
     async init() {
-        const rubric = await this.pb.loadRubric();
-        if (rubric) localStorage.setItem('pbRubric', JSON.stringify(rubric));
-        const groups = await this.pb.loadGroups();
-        if (groups.length > 0) localStorage.setItem('pbGroups', JSON.stringify(groups));
-
-        await this.pb._cleanInvalidEvaluations();
-        const pbEvals = await this.pb.loadEvaluations();
-        const localEvals = this._ls('pbEvals');
-        if (Object.keys(pbEvals).length > 0) {
-            localStorage.setItem('pbEvals', JSON.stringify(pbEvals));
-        } else if (localEvals) {
-            const parsed = JSON.parse(localEvals);
-            const hasValid = Object.keys(parsed).some(k => {
-                const under = k.indexOf('_');
-                const gi = parseInt(k.slice(0, under));
-                return !isNaN(gi);
-            });
-            if (hasValid) this.pb._restoreEvaluations(parsed);
-        }
-        const voters = await this.pb.loadVoters();
-        if (voters.length > 0) {
-            localStorage.setItem('pbVoters', JSON.stringify(voters));
-        } else if (this._ls('pbVoters')) {
-            this.pb.saveVoters(JSON.parse(this._ls('pbVoters')));
-        }
+        try {
+            const rubric = await this.pb.loadRubric();
+            if (rubric) localStorage.setItem('pbRubric', JSON.stringify(rubric));
+        } catch (e) {}
+        try {
+            const groups = await this.pb.loadGroups();
+            if (groups.length > 0) localStorage.setItem('pbGroups', JSON.stringify(groups));
+        } catch (e) {}
+        try {
+            await this.pb._cleanInvalidEvaluations();
+            const pbEvals = await this.pb.loadEvaluations();
+            const localEvals = this._ls('pbEvals');
+            if (Object.keys(pbEvals).length > 0) {
+                localStorage.setItem('pbEvals', JSON.stringify(pbEvals));
+            } else if (localEvals) {
+                const parsed = JSON.parse(localEvals);
+                const hasValid = Object.keys(parsed).some(k => {
+                    const under = k.indexOf('_');
+                    const gi = parseInt(k.slice(0, under));
+                    return !isNaN(gi);
+                });
+                if (hasValid) this.pb._restoreEvaluations(parsed);
+            }
+        } catch (e) {}
+        try {
+            const voters = await this.pb.loadVoters();
+            if (voters.length > 0) {
+                localStorage.setItem('pbVoters', JSON.stringify(voters));
+            } else if (this._ls('pbVoters')) {
+                this.pb.saveVoters(JSON.parse(this._ls('pbVoters')));
+            }
+        } catch (e) {}
     }
 
     _ls(key) { return localStorage.getItem(key); }
