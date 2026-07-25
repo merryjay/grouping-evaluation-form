@@ -24,6 +24,121 @@ class App {
         this.voterGroupIndex = null;
 
         window.app = this;
+
+        this._doLogout = () => {};
+        this._studentLogin = async () => {};
+        this._teacherLogin = () => {};
+        this._showRolePicker = () => {};
+        this._showNameInput = () => {};
+        this._showTeacherPw = () => {};
+
+        const a = window.app;
+        a._showRolePicker = () => {
+            const rp = document.getElementById('loginRolePicker');
+            const ni = document.getElementById('loginNameInput');
+            const tp = document.getElementById('loginTeacherPw');
+            if (rp) rp.style.display = 'block';
+            if (ni) ni.style.display = 'none';
+            if (tp) tp.style.display = 'none';
+        };
+        a._showNameInput = () => {
+            const rp = document.getElementById('loginRolePicker');
+            const ni = document.getElementById('loginNameInput');
+            const tp = document.getElementById('loginTeacherPw');
+            if (rp) rp.style.display = 'none';
+            if (ni) ni.style.display = 'block';
+            if (tp) tp.style.display = 'none';
+            const err = document.getElementById('loginError');
+            if (err) { err.style.display = 'none'; err.textContent = 'Please enter your name.'; }
+            const inp = document.getElementById('voterNameInput');
+            if (inp) inp.focus();
+        };
+        a._showTeacherPw = () => {
+            const rp = document.getElementById('loginRolePicker');
+            const ni = document.getElementById('loginNameInput');
+            const tp = document.getElementById('loginTeacherPw');
+            if (rp) rp.style.display = 'none';
+            if (ni) ni.style.display = 'none';
+            if (tp) tp.style.display = 'block';
+            const inp = document.getElementById('teacherPasswordInput');
+            if (inp) inp.focus();
+        };
+        a._doLogout = () => {
+            const wasVoter = this.currentVoter;
+            localStorage.removeItem('rubricLoggedInUser');
+            localStorage.removeItem('rubricDeviceName');
+            this.currentVoter = null;
+            this.isTeacher = false;
+            this.voterGroupIndex = null;
+            if (wasVoter) {
+                const v = this.voters.find(x => x.name.toLowerCase() === wasVoter.toLowerCase());
+                if (v) { v.loggedIn = false; this.storage.saveVoters(this.voters); }
+            }
+            this.evaluations.clearAll();
+            const lb = document.getElementById('logoutBtn');
+            if (lb) lb.style.display = 'none';
+            const ni = document.getElementById('voterNameInput');
+            if (ni) ni.value = '';
+            const pi = document.getElementById('teacherPasswordInput');
+            if (pi) pi.value = '';
+            const le = document.getElementById('loginError');
+            if (le) le.style.display = 'none';
+            const te = document.getElementById('teacherLoginError');
+            if (te) te.style.display = 'none';
+            const ol = document.getElementById('loginOverlay');
+            if (ol) ol.style.display = 'flex';
+            a._showRolePicker();
+        };
+        a._studentLogin = async () => {
+            const nameInput = document.getElementById('voterNameInput');
+            const name = nameInput ? nameInput.value.trim() : '';
+            if (!name) {
+                const err = document.getElementById('loginError');
+                if (err) err.style.display = 'block';
+                return;
+            }
+            try {
+                const raw = await this.storage.pb.loadEvaluations();
+                if (raw) {
+                    localStorage.setItem('pbEvals', JSON.stringify(raw));
+                    this.evaluations.fromJSON(raw);
+                }
+            } catch (e) {}
+            const err = document.getElementById('loginError');
+            if (err) err.style.display = 'none';
+            this.currentVoter = name;
+            this.isTeacher = false;
+            this.voterGroupIndex = null;
+            const existing = this.voters.find(v => v.name === name);
+            if (!existing) {
+                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+            } else {
+                existing.loggedIn = true;
+            }
+            this.storage.saveVoters(this.voters);
+            const ol = document.getElementById('loginOverlay');
+            if (ol) ol.style.display = 'none';
+            const lb = document.getElementById('logoutBtn');
+            if (lb) lb.style.display = '';
+            this._applyRoleVisibility();
+            this.evaluationPanel.buildGrid();
+        };
+        a._teacherLogin = () => {
+            const pwInput = document.getElementById('teacherPasswordInput');
+            const pw = pwInput ? pwInput.value : '';
+            const err = document.getElementById('teacherLoginError');
+            if (pw !== 'VSU2026Admin!') { if (err) err.style.display = 'block'; return; }
+            if (err) err.style.display = 'none';
+            this.currentVoter = null;
+            this.isTeacher = true;
+            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'teacher' }));
+            const ol = document.getElementById('loginOverlay');
+            if (ol) ol.style.display = 'none';
+            const lb = document.getElementById('logoutBtn');
+            if (lb) lb.style.display = '';
+            this._applyRoleVisibility();
+            this.dashboardPanel.render();
+        };
     }
 
     async init() {
@@ -52,108 +167,18 @@ class App {
     }
 
     _setupLogin() {
-        const overlay = document.getElementById('loginOverlay');
-        const rolePicker = document.getElementById('loginRolePicker');
-        const nameInputDiv = document.getElementById('loginNameInput');
-        const teacherPwDiv = document.getElementById('loginTeacherPw');
         const logoutBtn = document.getElementById('logoutBtn');
-        if (!overlay || !rolePicker || !nameInputDiv || !teacherPwDiv || !logoutBtn) return;
-
-        const showRolePicker = () => {
-            rolePicker.style.display = 'block';
-            nameInputDiv.style.display = 'none';
-            teacherPwDiv.style.display = 'none';
-        };
-        const showNameInput = () => {
-            rolePicker.style.display = 'none';
-            nameInputDiv.style.display = 'block';
-            teacherPwDiv.style.display = 'none';
-            const err = document.getElementById('loginError');
-            if (err) { err.style.display = 'none'; err.textContent = 'Please enter your name.'; }
-            const inp = document.getElementById('voterNameInput');
-            if (inp) inp.focus();
-        };
-        const showTeacherPw = () => {
-            rolePicker.style.display = 'none';
-            nameInputDiv.style.display = 'none';
-            teacherPwDiv.style.display = 'block';
-            const inp = document.getElementById('teacherPasswordInput');
-            if (inp) inp.focus();
-        };
-
-        this._doLogout = () => {
-            const wasVoter = this.currentVoter;
-            localStorage.removeItem('rubricLoggedInUser');
-            localStorage.removeItem('rubricDeviceName');
-            this.currentVoter = null;
-            this.isTeacher = false;
-            this.voterGroupIndex = null;
-            if (wasVoter) {
-                const v = this.voters.find(x => x.name.toLowerCase() === wasVoter.toLowerCase());
-                if (v) { v.loggedIn = false; this.storage.saveVoters(this.voters); }
-            }
-            this.evaluations.clearAll();
-            logoutBtn.style.display = 'none';
-            const ni = document.getElementById('voterNameInput');
-            if (ni) ni.value = '';
-            const pi = document.getElementById('teacherPasswordInput');
-            if (pi) pi.value = '';
-            const le = document.getElementById('loginError');
-            if (le) le.style.display = 'none';
-            const te = document.getElementById('teacherLoginError');
-            if (te) te.style.display = 'none';
-            showRolePicker();
-            overlay.style.display = 'flex';
-        };
-
-        window.app._showRolePicker = showRolePicker;
-        window.app._showNameInput = showNameInput;
-        window.app._showTeacherPw = showTeacherPw;
-        window.app._studentLogin = async () => {
-            const name = document.getElementById('voterNameInput').value.trim();
-            if (!name) { const err = document.getElementById('loginError'); if (err) err.style.display = 'block'; return; }
-            await this._freshSync();
-            const err = document.getElementById('loginError');
-            if (err) err.style.display = 'none';
-            this.currentVoter = name;
-            this.isTeacher = false;
-            this.voterGroupIndex = null;
-            const existing = this.voters.find(v => v.name === name);
-            if (!existing) {
-                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
-            } else {
-                existing.loggedIn = true;
-            }
-            this.storage.saveVoters(this.voters);
-            overlay.style.display = 'none';
-            logoutBtn.style.display = '';
-            this._applyRoleVisibility();
-            this._refreshStudentEvals();
-        };
-        window.app._teacherLogin = () => {
-            const pw = document.getElementById('teacherPasswordInput').value;
-            const err = document.getElementById('teacherLoginError');
-            if (pw !== 'VSU2026Admin!') { if (err) err.style.display = 'block'; return; }
-            if (err) err.style.display = 'none';
-            this.currentVoter = null;
-            this.isTeacher = true;
-            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'teacher' }));
-            overlay.style.display = 'none';
-            logoutBtn.style.display = '';
-            this._applyRoleVisibility();
-            this.dashboardPanel.render();
-        };
-
-        logoutBtn.addEventListener('click', () => this._doLogout());
+        if (logoutBtn) logoutBtn.addEventListener('click', () => this._doLogout());
         try {
-            document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
-            document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
-            document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
-            document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
-            document.getElementById('voterLoginBtn').addEventListener('click', () => window.app._studentLogin());
-            document.getElementById('voterNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
-            document.getElementById('teacherLoginBtn').addEventListener('click', () => window.app._teacherLogin());
-            document.getElementById('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._teacherLogin(); } });
+            const el = (id) => document.getElementById(id);
+            if (el('chooseStudentBtn')) el('chooseStudentBtn').addEventListener('click', () => window.app._showNameInput());
+            if (el('chooseTeacherBtn')) el('chooseTeacherBtn').addEventListener('click', () => window.app._showTeacherPw());
+            if (el('backToRolePickerBtn')) el('backToRolePickerBtn').addEventListener('click', () => window.app._showRolePicker());
+            if (el('backToRolePickerBtn2')) el('backToRolePickerBtn2').addEventListener('click', () => window.app._showRolePicker());
+            if (el('voterLoginBtn')) el('voterLoginBtn').addEventListener('click', () => window.app._studentLogin());
+            if (el('voterNameInput')) el('voterNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
+            if (el('teacherLoginBtn')) el('teacherLoginBtn').addEventListener('click', () => window.app._teacherLogin());
+            if (el('teacherPasswordInput')) el('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._teacherLogin(); } });
         } catch (e) { console.warn('Login wiring error', e); }
     }
 
