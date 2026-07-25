@@ -4,4 +4,6 @@
 !js/**/*
 !js/**/
 !.gitignore
+!netlify.toml
+!_redirects
 js/app.bundle.js
