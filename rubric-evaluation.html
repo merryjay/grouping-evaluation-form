@@ -566,8 +566,8 @@
     <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
     <p style="font-size:13px;color:#64748b;margin-bottom:24px;">Who are you?</p>
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <button id="chooseStudentBtn" onclick="showStudentLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
-      <button id="chooseTeacherBtn" onclick="showTeacherLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
+      <button id="chooseStudentBtn" onclick="var a=window.app;if(a&&a._showNameInput)a._showNameInput();else showStudentLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
+      <button id="chooseTeacherBtn" onclick="var a=window.app;if(a&&a._showTeacherPw)a._showTeacherPw();else showTeacherLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
     </div>
   </div>
 
@@ -575,12 +575,12 @@
     <h2 style="margin:0 0 6px;color:#1e293b;">Student Evaluation</h2>
     <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name to start evaluating groups.</p>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus>
-      <button id="voterLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
+      <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
+      <button id="voterLoginBtn" onclick="var a=window.app;if(a&&a._studentLogin)a._studentLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
     </div>
     <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
     <div style="margin-top:12px;">
-      <button id="backToRolePickerBtn" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+      <button id="backToRolePickerBtn" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
     </div>
   </div>
 
@@ -588,12 +588,12 @@
     <h2 style="margin:0 0 6px;color:#1e293b;">Teacher Access</h2>
     <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter the teacher password to access the dashboard.</p>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;">
-      <button id="teacherLoginBtn" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
+      <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._teacherLogin)a._teacherLogin()}">
+      <button id="teacherLoginBtn" onclick="var a=window.app;if(a&&a._teacherLogin)a._teacherLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
     </div>
     <p id="teacherLoginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Incorrect password.</p>
     <div style="margin-top:12px;">
-      <button id="backToRolePickerBtn2" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+      <button id="backToRolePickerBtn2" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
     </div>
   </div>
 </div>
@@ -605,7 +605,7 @@
                 <h1 style="font-size:24px;margin:0;">GROUPINGS EVALUATION FORM</h1>
                 <p style="font-size:12px;margin:4px 0 0;opacity:0.8;">Rate groups on multiple criteria with automatic score computation</p>
             </div>
-            <button id="logoutBtn" style="padding:6px 12px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;display:none;position:relative;z-index:2;">Logout</button>
+            <button id="logoutBtn" onclick="var a=window.app;if(a&&a._doLogout)a._doLogout()" style="padding:6px 12px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;display:none;position:relative;z-index:2;">Logout</button>
         </div>
     </header>
 

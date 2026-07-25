@@ -50,6 +50,7 @@ class App {
         const nameInputDiv = document.getElementById('loginNameInput');
         const teacherPwDiv = document.getElementById('loginTeacherPw');
         const logoutBtn = document.getElementById('logoutBtn');
+        if (!overlay || !rolePicker || !nameInputDiv || !teacherPwDiv || !logoutBtn) return;
 
         const showRolePicker = () => {
             rolePicker.style.display = 'block';
@@ -60,15 +61,17 @@ class App {
             rolePicker.style.display = 'none';
             nameInputDiv.style.display = 'block';
             teacherPwDiv.style.display = 'none';
-            document.getElementById('loginError').style.display = 'none';
-            document.getElementById('loginError').textContent = 'Please enter your name.';
-            document.getElementById('voterNameInput').focus();
+            const err = document.getElementById('loginError');
+            if (err) { err.style.display = 'none'; err.textContent = 'Please enter your name.'; }
+            const inp = document.getElementById('voterNameInput');
+            if (inp) inp.focus();
         };
         const showTeacherPw = () => {
             rolePicker.style.display = 'none';
             nameInputDiv.style.display = 'none';
             teacherPwDiv.style.display = 'block';
-            document.getElementById('teacherPasswordInput').focus();
+            const inp = document.getElementById('teacherPasswordInput');
+            if (inp) inp.focus();
         };
 
         this._doLogout = () => {
@@ -84,27 +87,27 @@ class App {
             }
             this.evaluations.clearAll();
             logoutBtn.style.display = 'none';
-            document.getElementById('voterNameInput').value = '';
-            document.getElementById('teacherPasswordInput').value = '';
-            document.getElementById('loginError').style.display = 'none';
-            document.getElementById('teacherLoginError').style.display = 'none';
+            const ni = document.getElementById('voterNameInput');
+            if (ni) ni.value = '';
+            const pi = document.getElementById('teacherPasswordInput');
+            if (pi) pi.value = '';
+            const le = document.getElementById('loginError');
+            if (le) le.style.display = 'none';
+            const te = document.getElementById('teacherLoginError');
+            if (te) te.style.display = 'none';
             showRolePicker();
             overlay.style.display = 'flex';
         };
 
-        logoutBtn.addEventListener('click', () => this._doLogout());
-        document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
-        document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
-        document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
-        document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
-
-        const studentLogin = async () => {
+        window.app._showRolePicker = showRolePicker;
+        window.app._showNameInput = showNameInput;
+        window.app._showTeacherPw = showTeacherPw;
+        window.app._studentLogin = async () => {
             const name = document.getElementById('voterNameInput').value.trim();
-            if (!name) { document.getElementById('loginError').style.display = 'block'; return; }
-
+            if (!name) { const err = document.getElementById('loginError'); if (err) err.style.display = 'block'; return; }
             await this._freshSync();
-
-            document.getElementById('loginError').style.display = 'none';
+            const err = document.getElementById('loginError');
+            if (err) err.style.display = 'none';
             this.currentVoter = name;
             this.isTeacher = false;
             this.voterGroupIndex = null;
@@ -120,14 +123,11 @@ class App {
             this._applyRoleVisibility();
             this._refreshStudentEvals();
         };
-
-        document.getElementById('voterLoginBtn').addEventListener('click', studentLogin);
-        document.getElementById('voterNameInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') studentLogin(); });
-
-        const teacherLogin = () => {
+        window.app._teacherLogin = () => {
             const pw = document.getElementById('teacherPasswordInput').value;
-            if (pw !== 'VSU2026Admin!') { document.getElementById('teacherLoginError').style.display = 'block'; return; }
-            document.getElementById('teacherLoginError').style.display = 'none';
+            const err = document.getElementById('teacherLoginError');
+            if (pw !== 'VSU2026Admin!') { if (err) err.style.display = 'block'; return; }
+            if (err) err.style.display = 'none';
             this.currentVoter = null;
             this.isTeacher = true;
             localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'teacher' }));
@@ -137,8 +137,17 @@ class App {
             this.dashboardPanel.render();
         };
 
-        document.getElementById('teacherLoginBtn').addEventListener('click', teacherLogin);
-        document.getElementById('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); teacherLogin(); } });
+        logoutBtn.addEventListener('click', () => this._doLogout());
+        try {
+            document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
+            document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
+            document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
+            document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
+            document.getElementById('voterLoginBtn').addEventListener('click', () => window.app._studentLogin());
+            document.getElementById('voterNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
+            document.getElementById('teacherLoginBtn').addEventListener('click', () => window.app._teacherLogin());
+            document.getElementById('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._teacherLogin(); } });
+        } catch (e) { console.warn('Login wiring error', e); }
     }
 
     async _freshSync() {
