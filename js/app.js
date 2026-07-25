@@ -28,6 +28,7 @@ class App {
 
     async init() {
         await this.storage.init();
+        localStorage.removeItem('pbRubric');
         this._loadData();
         this.voters = this.storage.loadVoters();
         this.setupPanel.loadRubricIntoUI();

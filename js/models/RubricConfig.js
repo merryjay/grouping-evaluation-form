@@ -20,7 +20,9 @@ class RubricConfig {
     fromJSON(data) {
         if (data.activityName) this.activityName = data.activityName;
         if (data.maxScore) this.maxScore = data.maxScore;
-        if (data.criteria) this.criteria = data.criteria.map(c => ({ ...c }));
+        if (data.criteria && data.criteria.length >= this.criteria.length) {
+            this.criteria = data.criteria.map(c => ({ ...c }));
+        }
         return this;
     }
 
