@@ -8,4 +8,7 @@
 !.gitignore
 !netlify.toml
 !_redirects
+!test/
+!test/**/*
+!package.json
 js/app.bundle.js

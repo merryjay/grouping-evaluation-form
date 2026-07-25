@@ -27,21 +27,28 @@ class App {
     }
 
     async init() {
-        await this.storage.init();
+        try {
+            await this.storage.init();
+        } catch (e) { console.warn('storage init failed', e); }
         localStorage.removeItem('pbRubric');
-        this._loadData();
-        this.voters = this.storage.loadVoters();
-        this.setupPanel.loadRubricIntoUI();
-        this.groupPanel.buildList();
+        try { this._loadData(); } catch (e) { console.warn('loadData failed', e); }
+        try { this.voters = this.storage.loadVoters(); } catch (e) { console.warn('loadVoters failed', e); }
+        try { this.setupPanel.loadRubricIntoUI(); } catch (e) { console.warn('loadRubricIntoUI failed', e); }
+        try { this.groupPanel.buildList(); } catch (e) { console.warn('buildList failed', e); }
         this._setupLogin();
-        this._setupTabListeners();
-        this._setupGlobalListeners();
+        try { this._setupTabListeners(); } catch (e) { console.warn('tab listeners failed', e); }
+        try { this._setupGlobalListeners(); } catch (e) { console.warn('global listeners failed', e); }
 
-        if (this.evaluations.size() > 0) {
-            this.evaluationPanel.buildGrid();
-        }
+        try {
+            if (this.evaluations.size() > 0) {
+                this.evaluationPanel.buildGrid();
+            }
+        } catch (e) { console.warn('buildGrid failed', e); }
 
-        this.rubric.activityName = document.getElementById('activityName').value;
+        try {
+            const an = document.getElementById('activityName');
+            if (an) this.rubric.activityName = an.value;
+        } catch (e) {}
     }
 
     _setupLogin() {
