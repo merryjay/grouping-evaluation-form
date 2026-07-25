@@ -112,7 +112,7 @@ class SetupPanel {
         for (let s = maxScore; s >= 1; s--) {
             html += `<th>${labels[s - 1]} (${s})</th>`;
         }
-        html += `</tr>`;
+        html += `<th>Score</th></tr>`;
 
         criteria.forEach(c => {
             html += `<tr><td class="criteria-name">${this._escapeHtml(c.name)}</td>`;
@@ -120,7 +120,7 @@ class SetupPanel {
                 const desc = this.rubric.getDescriptor(c.name, s);
                 html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
             }
-            html += `</tr>`;
+            html += `<td>${c.weight}%</td></tr>`;
         });
         html += `</table></div>`;
         this.el.rubricPreview.innerHTML = html;

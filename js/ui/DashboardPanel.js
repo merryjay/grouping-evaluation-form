@@ -57,34 +57,36 @@ class DashboardPanel {
             });
             html += `</table></div></div>`;
 
-            html += `<div class="card">
-                <h2>Criteria Evaluation Table</h2>
-                <div style="overflow-x:auto;">
-                <table class="rubric-table">
-                    <tr><th>Criteria</th>`;
-            const rubric = this.app.rubric;
-            const labels = rubric ? rubric.getScoreLabels() : [];
-            for (let s = rubric.maxScore; s >= 1; s--) {
-                html += `<th>${labels[s - 1]} (${s})</th>`;
-            }
-            html += `<th>Score</th></tr>`;
-            if (rubric && rubric.criteria.length > 0) {
-                rubric.criteria.forEach(c => {
-                    const avg = aggregated.reduce((sum, g) => {
-                        return sum + (g.scores[c.name] || 0);
-                    }, 0) / aggregated.length;
-                    html += `<tr><td class="criteria-name">${c.name}</td>`;
-                    for (let s = rubric.maxScore; s >= 1; s--) {
-                        const desc = rubric.getDescriptor(c.name, s);
-                        html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
-                    }
-                    const pct = (avg / rubric.maxScore * 100).toFixed(0);
-                    const color = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444';
-                    html += `<td style="font-weight:700;color:${color};font-size:16px;">${avg.toFixed(1)}</td>`;
-                    html += `</tr>`;
-                });
-            }
-            html += `</table></div></div>`;
+            `;
+
+        const rubric = this.app.rubric;
+        const labels = rubric ? rubric.getScoreLabels() : [];
+        html += `<div class="card">
+            <h2>Criteria Evaluation Table</h2>
+            <div style="overflow-x:auto;">
+            <table class="rubric-table">
+                <tr><th>Criteria</th>`;
+        for (let s = rubric.maxScore; s >= 1; s--) {
+            html += `<th>${labels[s - 1]} (${s})</th>`;
+        }
+        html += `<th>Score</th></tr>`;
+        if (rubric && rubric.criteria.length > 0) {
+            rubric.criteria.forEach(c => {
+                const avg = aggregated.length > 0 ? aggregated.reduce((sum, g) => {
+                    return sum + (g.scores[c.name] || 0);
+                }, 0) / aggregated.length : 0;
+                html += `<tr><td class="criteria-name">${c.name}</td>`;
+                for (let s = rubric.maxScore; s >= 1; s--) {
+                    const desc = rubric.getDescriptor(c.name, s);
+                    html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
+                }
+                const pct = avg > 0 ? (avg / rubric.maxScore * 100).toFixed(0) : 0;
+                const color = avg > 0 ? (pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444') : '#94a3b8';
+                html += `<td style="font-weight:700;color:${color};font-size:16px;">${avg > 0 ? avg.toFixed(1) : '&mdash;'}</td>`;
+                html += `</tr>`;
+            });
+        }
+        html += `</table></div></div>`;
         } else {
             html += `<div class="card"><div class="empty-state"><p>No evaluations yet. Students need to vote first.</p></div></div>`;
         }
