@@ -56,22 +56,6 @@ class App {
                 document.getElementById('logoutBtn').style.display = '';
                 this._applyRoleVisibility();
                 this.dashboardPanel.render();
-            } else if (data.type === 'student' && data.name) {
-                if (data.name.toLowerCase() === 'merry jay tumulak') data.name = 'merry jay tumulak';
-                this.currentVoter = data.name;
-                this.isTeacher = false;
-                const existing = this.voters.find(v => v.name.toLowerCase() === data.name.toLowerCase());
-                if (existing) {
-                    existing.loggedIn = true;
-                } else {
-                    this.voters.push({ name: data.name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
-                }
-                this.storage.saveVoters(this.voters);
-                this._findVoterGroup();
-                document.getElementById('loginOverlay').style.display = 'none';
-                document.getElementById('logoutBtn').style.display = '';
-                this._applyRoleVisibility();
-                this.evaluationPanel.buildGrid();
             }
         } catch (e) {}
     }
@@ -79,32 +63,31 @@ class App {
     _setupLogin() {
         const overlay = document.getElementById('loginOverlay');
         const rolePicker = document.getElementById('loginRolePicker');
-        const nameInputDiv = document.getElementById('loginNameInput');
         const teacherPwDiv = document.getElementById('loginTeacherPw');
         const logoutBtn = document.getElementById('logoutBtn');
 
         const showRolePicker = () => {
             rolePicker.style.display = 'block';
-            nameInputDiv.style.display = 'none';
             teacherPwDiv.style.display = 'none';
-        };
-        const showNameInput = () => {
-            rolePicker.style.display = 'none';
-            nameInputDiv.style.display = 'block';
-            teacherPwDiv.style.display = 'none';
-            document.getElementById('voterNameInput').focus();
         };
         const showTeacherPw = () => {
             rolePicker.style.display = 'none';
-            nameInputDiv.style.display = 'none';
             teacherPwDiv.style.display = 'block';
             document.getElementById('teacherPasswordInput').focus();
+        };
+
+        const _getDeviceId = () => {
+            let id = localStorage.getItem('rubricDeviceId');
+            if (!id) {
+                id = 'Device_' + Math.random().toString(36).substring(2, 8);
+                localStorage.setItem('rubricDeviceId', id);
+            }
+            return id;
         };
 
         this._doLogout = () => {
             const wasVoter = this.currentVoter;
             localStorage.removeItem('rubricLoggedInUser');
-            localStorage.removeItem('rubricDeviceName');
             this.currentVoter = null;
             this.isTeacher = false;
             this.voterGroupIndex = null;
@@ -114,74 +97,33 @@ class App {
             }
             this.evaluations.clearAll();
             logoutBtn.style.display = 'none';
-            document.getElementById('voterNameInput').value = '';
             document.getElementById('teacherPasswordInput').value = '';
-            document.getElementById('loginError').style.display = 'none';
             document.getElementById('teacherLoginError').style.display = 'none';
             showRolePicker();
             overlay.style.display = 'flex';
         };
 
-        document.getElementById('chooseStudentBtn').addEventListener('click', showNameInput);
-        document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
-        document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
-        document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
-
-        const _matchGroupMember = (raw) => {
-            const lower = raw.toLowerCase();
-            const all = this.groups.getAll();
-            for (let i = 0; i < all.length; i++) {
-                for (const m of this.groups.getMemberList(i)) {
-                    const ml = m.toLowerCase();
-                    if (ml === lower || ml.startsWith(lower + ' ') || ml.endsWith(' ' + lower)) return m;
-                }
-            }
-            return null;
-        };
-
         const studentLogin = async () => {
-            const raw = document.getElementById('voterNameInput').value.trim();
-            if (!raw) { document.getElementById('loginError').style.display = 'block'; return; }
-            const isMerry = raw.toLowerCase() === 'merry jay tumulak';
-
             await this._freshSync();
-
-            if (isMerry) var name = 'merry jay tumulak';
-            else {
-                const matched = _matchGroupMember(raw);
-                if (!matched) {
-                    document.getElementById('loginError').textContent = 'Your name is not listed in any group.';
-                    document.getElementById('loginError').style.display = 'block';
-                    return;
-                }
-                name = matched;
-            }
-            const existing = this.voters.find(v => v.name.toLowerCase() === name.toLowerCase());
-            if (!isMerry && existing && existing.loggedIn) {
-                document.getElementById('loginError').textContent = 'This name is already taken on another device.';
-                document.getElementById('loginError').style.display = 'block';
-                return;
-            }
-            document.getElementById('loginError').style.display = 'none';
-            this.currentVoter = isMerry ? null : name;
-            this.isTeacher = isMerry;
-            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: isMerry ? 'teacher' : 'student', name }));
+            const deviceId = _getDeviceId();
+            this.currentVoter = deviceId;
+            this.isTeacher = false;
+            this.voterGroupIndex = null;
+            const existing = this.voters.find(v => v.name === deviceId);
             if (!existing) {
-                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                this.voters.push({ name: deviceId, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
             } else {
                 existing.loggedIn = true;
             }
             this.storage.saveVoters(this.voters);
-            if (!isMerry) this._findVoterGroup();
             overlay.style.display = 'none';
             logoutBtn.style.display = '';
             this._applyRoleVisibility();
-            if (!isMerry) this._refreshStudentEvals();
-            else this.dashboardPanel.render();
+            this._refreshStudentEvals();
         };
 
-        document.getElementById('voterLoginBtn').addEventListener('click', studentLogin);
-        document.getElementById('voterNameInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') studentLogin(); });
+        document.getElementById('chooseStudentBtn').addEventListener('click', studentLogin);
+        document.getElementById('chooseTeacherBtn').addEventListener('click', showTeacherPw);
 
         const teacherLogin = () => {
             const pw = document.getElementById('teacherPasswordInput').value;
@@ -198,6 +140,8 @@ class App {
 
         document.getElementById('teacherLoginBtn').addEventListener('click', teacherLogin);
         document.getElementById('teacherPasswordInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') teacherLogin(); });
+
+        document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
     }
 
     async _freshSync() {
