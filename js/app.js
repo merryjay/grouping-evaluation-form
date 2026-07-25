@@ -30,7 +30,6 @@ class App {
         await this.storage.init();
         this._loadData();
         this.voters = this.storage.loadVoters();
-        this._ensureDefaultMembers();
         this.setupPanel.loadRubricIntoUI();
         this.groupPanel.buildList();
         this._setupLogin();
@@ -98,47 +97,23 @@ class App {
         document.getElementById('backToRolePickerBtn').addEventListener('click', showRolePicker);
         document.getElementById('backToRolePickerBtn2').addEventListener('click', showRolePicker);
 
-        const _matchGroupMember = (raw) => {
-            const lower = raw.toLowerCase();
-            const all = this.groups.getAll();
-            for (let i = 0; i < all.length; i++) {
-                for (const m of this.groups.getMemberList(i)) {
-                    const ml = m.toLowerCase();
-                    if (ml === lower || ml.startsWith(lower + ' ') || ml.endsWith(' ' + lower)) return m;
-                }
-            }
-            return null;
-        };
-
         const studentLogin = async () => {
-            const raw = document.getElementById('voterNameInput').value.trim();
-            if (!raw) { document.getElementById('loginError').style.display = 'block'; return; }
+            const name = document.getElementById('voterNameInput').value.trim();
+            if (!name) { document.getElementById('loginError').style.display = 'block'; return; }
 
             await this._freshSync();
 
-            const matched = _matchGroupMember(raw);
-            if (!matched) {
-                document.getElementById('loginError').textContent = 'Your name is not listed in any group.';
-                document.getElementById('loginError').style.display = 'block';
-                return;
-            }
-            const existing = this.voters.find(v => v.name.toLowerCase() === matched.toLowerCase());
-            if (existing && existing.loggedIn) {
-                document.getElementById('loginError').textContent = 'This name is already taken on another device.';
-                document.getElementById('loginError').style.display = 'block';
-                return;
-            }
             document.getElementById('loginError').style.display = 'none';
-            this.currentVoter = matched;
+            this.currentVoter = name;
             this.isTeacher = false;
-            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'student', name: matched }));
+            this.voterGroupIndex = null;
+            const existing = this.voters.find(v => v.name === name);
             if (!existing) {
-                this.voters.push({ name: matched, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
             } else {
                 existing.loggedIn = true;
             }
             this.storage.saveVoters(this.voters);
-            this._findVoterGroup();
             overlay.style.display = 'none';
             logoutBtn.style.display = '';
             this._applyRoleVisibility();
@@ -183,7 +158,6 @@ class App {
             if (groups && groups.length > 0) {
                 localStorage.setItem('pbGroups', JSON.stringify(groups));
                 this.groups.fromJSON(groups);
-                this._ensureDefaultMembers();
                 this.groupPanel.buildList();
             }
         } catch (e) {}
@@ -201,20 +175,6 @@ class App {
         if (this.tabManager) {
             const active = this.tabManager.activeTab;
         }
-    }
-
-    _findVoterGroup() {
-        this.voterGroupIndex = null;
-        if (!this.currentVoter) return;
-        this.groups.getAll().forEach((g, i) => {
-            const members = this.groups.getMemberList(i);
-            const match = members.some(m =>
-                m.toLowerCase() === this.currentVoter.toLowerCase() ||
-                m.toLowerCase().startsWith(this.currentVoter.toLowerCase() + ' ') ||
-                m.toLowerCase().endsWith(' ' + this.currentVoter.toLowerCase())
-            );
-            if (match) this.voterGroupIndex = i;
-        });
     }
 
     _applyRoleVisibility() {
@@ -246,64 +206,6 @@ class App {
 
         const savedEvals = this.storage.loadEvaluations();
         if (savedEvals) this.evaluations.fromJSON(savedEvals);
-    }
-
-    _ensureDefaultMembers() {
-        const addMember = (groupIndex, name, prepend = false) => {
-            const group = this.groups.get(groupIndex);
-            if (!group) return;
-            const members = group.members ? group.members.split('\n').map(m => m.trim()).filter(m => m) : [];
-            if (!members.includes(name)) {
-                if (prepend) {
-                    members.unshift(name);
-                } else {
-                    members.push(name);
-                }
-                group.members = members.join('\n');
-                return true;
-            }
-            return false;
-        };
-
-        let changed = false;
-
-        changed |= addMember(0, 'Nathaniel Rodrigo', true);
-        changed |= addMember(0, 'Junna Dag-uman');
-        changed |= addMember(0, 'Merry Jay Tumulak');
-
-        changed |= addMember(1, 'Krizia Nicole Rubio');
-        changed |= addMember(1, 'Althea Tanguamos');
-        changed |= addMember(1, 'John Alrey Gementiza');
-
-        changed |= addMember(2, 'Aranas Vince');
-        changed |= addMember(2, 'Palangan Lucille Mae');
-        changed |= addMember(2, 'Tariao Justine Jean');
-
-        changed |= addMember(3, 'Kevin Jay Morales');
-        changed |= addMember(3, 'Nylvia Apao');
-        changed |= addMember(3, 'Rosalden Rabago');
-
-        changed |= addMember(4, 'James Susas');
-        changed |= addMember(4, 'Mark Antolijao');
-        changed |= addMember(4, 'Eirich Dianne Molde');
-
-        changed |= addMember(5, 'Bal Gestly Labador');
-        changed |= addMember(5, 'Elmie Soltes');
-        changed |= addMember(5, 'Steven Yoldan');
-
-        changed |= addMember(6, 'Andrew Sambulan');
-        changed |= addMember(6, 'Allan Baguio');
-        changed |= addMember(6, 'Archie Jutag');
-
-        changed |= addMember(7, 'Angel Lou Geografo');
-        changed |= addMember(7, 'Juliemar Bartolo');
-        changed |= addMember(7, 'Gabriel Salaveria');
-
-        changed |= addMember(8, 'April Gulbin');
-
-        if (changed) {
-            this.storage.saveGroups(this.groups.toJSON());
-        }
     }
 
     _setupTabListeners() {
@@ -348,39 +250,27 @@ class App {
     _renderVoters() {
         const container = document.getElementById('votersList');
         const allEntries = this.evaluations.getAllEntries();
-        const allMembers = new Map();
-        this.groups.getAll().forEach((g, i) => {
-            const members = this.groups.getMemberList(i);
-            members.forEach(m => {
-                if (!allMembers.has(m)) allMembers.set(m, []);
-                allMembers.get(m).push({ name: g.name, index: i });
-            });
-        });
         const votersMap = {};
         allEntries.forEach(e => {
             if (!votersMap[e.voter]) votersMap[e.voter] = { count: 0, groups: [] };
             votersMap[e.voter].count++;
             votersMap[e.voter].groups.push(e.groupIndex);
         });
-        const allNames = [...new Set([...allMembers.keys(), ...this.voters.map(v => v.name)])];
-        allNames.sort();
+        const allNames = Object.keys(votersMap).sort();
         if (allNames.length === 0) {
-            container.innerHTML = '<div class="empty-state"><p>No students found.</p></div>';
+            container.innerHTML = '<div class="empty-state"><p>No votes recorded yet.</p></div>';
             return;
         }
         const totalGroups = this.groups.size();
-        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Group</th><th>Groups Rated</th><th>Status</th></tr>';
+        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Groups Rated</th><th>Status</th></tr>';
         allNames.forEach((name, i) => {
             const voterData = votersMap[name];
             const groupsRated = voterData ? voterData.count : 0;
-            const memberGroups = allMembers.get(name) || [];
-            const groupNames = memberGroups.map(g => g.name).join(', ');
             const statusClass = groupsRated > 0 ? 'grade-A' : 'grade-D';
             const statusText = groupsRated > 0 ? 'Voted' : 'Not yet';
             html += `<tr>
                 <td>${i + 1}</td>
                 <td><strong>${name}</strong></td>
-                <td style="font-size:11px;color:#64748b;">${groupNames || '&mdash;'}</td>
                 <td>${groupsRated} / ${totalGroups}</td>
                 <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
             </tr>`;
