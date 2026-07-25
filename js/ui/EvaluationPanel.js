@@ -57,9 +57,6 @@ class EvaluationPanel {
             html += `<div style="display:flex; justify-content:space-between; align-items:center;">`;
             html += `<div class="group-name" style="font-size:16px; font-weight:700; color:#1e293b;">${this._escapeHtml(group.name)}${isOwnGroup ? ' <span style="font-size:10px;color:#e74c3c;font-weight:600;background:#fee2e2;padding:2px 8px;border-radius:10px;margin-left:6px;">YOUR GROUP</span>' : ''}${hasVoted ? ' <span style="font-size:10px;color:#059669;font-weight:600;background:#d1fae5;padding:2px 8px;border-radius:10px;margin-left:6px;">✓ VOTED</span>' : ''}</div>`;
             html += `<div style="display:flex; align-items:center; gap:8px;">`;
-            if (evalData.scores && window.app && window.app.isTeacher) {
-                html += `<span class="grade-badge grade-${evalData.grade.charAt(0)}" style="font-size:11px; padding:4px 10px;">${evalData.grade} &mdash; ${evalData.totalWeighted}%</span>`;
-            }
             if (!isOwnGroup && !hasVoted) {
                 html += `<span class="eval-toggle-icon" style="font-size:14px; color:#94a3b8;">&#9660;</span>`;
             }
@@ -70,13 +67,9 @@ class EvaluationPanel {
             if (isOwnGroup) {
                 html += `<div style="padding:14px;text-align:center;color:#94a3b8;font-size:13px;">You cannot rate your own group.</div>`;
             } else if (hasVoted) {
-                const saved = this.evaluations.get(actualIndex, voter);
-                const canChange = window.app && window.app.isTeacher;
                 html += `<div style="padding:14px;text-align:center;">
-                    <p style="color:#059669;font-size:14px;font-weight:600;margin-bottom:8px;">✓ You have already rated this group.</p>
-                    <p style="color:#64748b;font-size:12px;">Your score: ${saved.totalRaw} raw, ${saved.totalWeighted}% weighted, Grade: ${saved.grade}</p>` +
-                    (canChange ? `<button class="change-vote-btn" data-group="${actualIndex}" style="margin-top:8px;padding:8px 20px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;">Change Vote</button>` : '') +
-                `</div>`;
+                    <p style="color:#059669;font-size:14px;font-weight:600;">✓ You have already rated this group.</p>
+                </div>`;
             } else {
                 html += `<div class="eval-body" id="eval-body-${actualIndex}" style="display:none; margin-top:12px;">`;
                 html += `<div class="rating-section">`;
@@ -93,15 +86,11 @@ class EvaluationPanel {
                         html += `<button class="star-btn ${selectedClass}" data-score="${s}">${s}</button>`;
                     }
                     html += `</div>`;
-                    if (currentScore > 0) {
-                        html += `<div class="rating-label" style="color:#27ae60; font-weight:600; margin-top:4px;">${currentScore} - ${scoreLabel}</div>`;
-                    }
                     html += `</div>`;
                 });
 
                 html += `</div>`;
-                html += `<div class="score-summary" id="score-summary-${actualIndex}" style="margin-top:12px; padding:12px; background:#f1f5f9; border-radius:10px; text-align:center; font-size:14px; font-weight:600; color:#475569;">Raw: 0 / ${this.rubric.criteria.length * this.rubric.maxScore} &nbsp;|&nbsp; Weighted: 0% &nbsp;|&nbsp; Grade: &mdash;</div>`;
-                html += `<div style="display:flex; gap:8px; margin-top:8px;">`;
+                html += `<div style="display:flex; gap:8px; margin-top:12px;">`;
                 html += `<button class="save-group-btn" data-group-index="${actualIndex}" style="flex:1;">Submit Vote</button>`;
                 if (evalData.scores && window.app && window.app.isTeacher) {
                     html += `<button class="btn btn-danger delete-eval-btn" data-group="${actualIndex}" style="flex:0 0 auto; padding:10px 16px; font-size:13px; width:auto;">Delete</button>`;
@@ -137,8 +126,6 @@ class EvaluationPanel {
                 const parent = btn.closest('.star-rating');
                 parent.querySelectorAll('.star-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-                const groupIndex = parseInt(parent.dataset.group);
-                this._updateLiveScore(groupIndex);
             });
         });
 
@@ -166,31 +153,7 @@ class EvaluationPanel {
             });
         });
 
-        this.el.grid.querySelectorAll('.star-rating').forEach(rating => {
-            const groupIndex = parseInt(rating.dataset.group);
-            const hasScore = rating.querySelector('.star-btn.selected');
-            if (hasScore) this._updateLiveScore(groupIndex);
-        });
-    }
 
-    _getScores(groupIndex) {
-        const scores = {};
-        this.rubric.criteria.forEach((c, ci) => {
-            const container = this.el.grid.querySelector(`.star-rating[data-group="${groupIndex}"][data-criterion="${ci}"]`);
-            const selected = container ? container.querySelector('.star-btn.selected') : null;
-            scores[c.name] = selected ? parseInt(selected.dataset.score) : 0;
-        });
-        return scores;
-    }
-
-    _updateLiveScore(groupIndex) {
-        const scores = this._getScores(groupIndex);
-        const result = this.scoring.calculate(scores);
-        const summary = document.getElementById(`score-summary-${groupIndex}`);
-        if (summary) {
-            const maxRaw = this.rubric.criteria.length * this.rubric.maxScore;
-            summary.innerHTML = `Raw: ${result.totalRaw} / ${maxRaw} &nbsp;|&nbsp; Weighted: ${result.totalWeighted}% &nbsp;|&nbsp; Grade: ${result.grade}`;
-        }
     }
 
     _toggleBody(groupIndex) {
@@ -227,7 +190,12 @@ class EvaluationPanel {
             }
             const voter = this._getVoter();
             if (voter === 'unknown') { if (btn) { btn.disabled = false; btn.textContent = 'Submit Vote'; } return; }
-            const scores = this._getScores(groupIndex);
+            const scores = {};
+            this.rubric.criteria.forEach((c, ci) => {
+                const container = this.el.grid.querySelector(`.star-rating[data-group="${groupIndex}"][data-criterion="${ci}"]`);
+                const selected = container ? container.querySelector('.star-btn.selected') : null;
+                scores[c.name] = selected ? parseInt(selected.dataset.score) : 0;
+            });
             const result = this.scoring.calculate(scores);
 
             await this.storage.pb.saveEvaluation(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
