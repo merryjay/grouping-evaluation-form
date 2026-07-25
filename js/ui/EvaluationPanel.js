@@ -79,7 +79,7 @@ class EvaluationPanel {
                     const currentScore = evalData.scores ? evalData.scores[c.name] : 0;
                     const scoreLabel = currentScore > 0 ? labels[currentScore - 1] : '';
                     html += `<div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:10px;">`;
-                    html += `<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">${this._escapeHtml(c.name)} <span style="color:#94a3b8; font-weight:400;">(${c.weight}%)</span></div>`;
+                    html += `<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">${this._escapeHtml(c.name)}</div>`;
                     html += `<div class="star-rating" data-group="${actualIndex}" data-criterion="${ci}">`;
                     for (let s = 1; s <= this.rubric.maxScore; s++) {
                         const selectedClass = s === currentScore ? 'selected' : '';
