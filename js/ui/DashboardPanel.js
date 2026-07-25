@@ -75,7 +75,8 @@ class DashboardPanel {
                     }, 0) / aggregated.length;
                     html += `<tr><td class="criteria-name">${c.name}</td>`;
                     for (let s = rubric.maxScore; s >= 1; s--) {
-                        html += `<td class="descriptor">${rubric.getDescriptor(c.name, s)}</td>`;
+                        const desc = rubric.getDescriptor(c.name, s);
+                        html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
                     }
                     const pct = (avg / rubric.maxScore * 100).toFixed(0);
                     const color = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444';

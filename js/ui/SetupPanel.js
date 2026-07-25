@@ -107,21 +107,22 @@ class SetupPanel {
         }
 
         const labels = this.rubric.getScoreLabels();
-        let html = `<table class="rubric-table">
-            <tr><th>Criterion</th><th>Weight</th>`;
-        labels.forEach((l, i) => {
-            html += `<th>${i + 1} - ${l}</th>`;
-        });
-        html += `</tr>`;
+        let html = `<div style="overflow-x:auto;"><table class="rubric-table">
+            <tr><th>Criteria</th>`;
+        for (let s = maxScore; s >= 1; s--) {
+            html += `<th>${labels[s - 1]} (${s})</th>`;
+        }
+        html += `<th>Weight</th></tr>`;
 
         criteria.forEach(c => {
-            html += `<tr><td class="criteria-name">${this._escapeHtml(c.name)}</td><td>${c.weight}%</td>`;
-            for (let s = 1; s <= maxScore; s++) {
-                html += `<td class="descriptor"><strong>${s} pt:</strong> ${this.rubric.getDescriptor(c.name, s)}</td>`;
+            html += `<tr><td class="criteria-name">${this._escapeHtml(c.name)}</td>`;
+            for (let s = maxScore; s >= 1; s--) {
+                const desc = this.rubric.getDescriptor(c.name, s);
+                html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
             }
-            html += `</tr>`;
+            html += `<td>${c.weight}%</td></tr>`;
         });
-        html += `</table>`;
+        html += `</table></div>`;
         this.el.rubricPreview.innerHTML = html;
     }
 
