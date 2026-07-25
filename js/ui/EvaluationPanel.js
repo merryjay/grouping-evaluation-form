@@ -75,11 +75,12 @@ class EvaluationPanel {
                 html += `<div style="padding:14px;text-align:center;color:#94a3b8;font-size:13px;">You cannot rate your own group.</div>`;
             } else if (hasVoted) {
                 const saved = this.evaluations.get(actualIndex, voter);
+                const canChange = window.app && window.app.isTeacher;
                 html += `<div style="padding:14px;text-align:center;">
                     <p style="color:#059669;font-size:14px;font-weight:600;margin-bottom:8px;">✓ You have already rated this group.</p>
-                    <p style="color:#64748b;font-size:12px;">Your score: ${saved.totalRaw} raw, ${saved.totalWeighted}% weighted, Grade: ${saved.grade}</p>
-                    <button class="change-vote-btn" data-group="${actualIndex}" style="margin-top:8px;padding:8px 20px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;">Change Vote</button>
-                </div>`;
+                    <p style="color:#64748b;font-size:12px;">Your score: ${saved.totalRaw} raw, ${saved.totalWeighted}% weighted, Grade: ${saved.grade}</p>` +
+                    (canChange ? `<button class="change-vote-btn" data-group="${actualIndex}" style="margin-top:8px;padding:8px 20px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;">Change Vote</button>` : '') +
+                `</div>`;
             } else {
                 html += `<div class="eval-body" id="eval-body-${actualIndex}" style="display:none; margin-top:12px;">`;
                 html += `<div class="rating-section">`;
@@ -106,7 +107,7 @@ class EvaluationPanel {
                 html += `<div class="score-summary" id="score-summary-${actualIndex}" style="margin-top:12px; padding:12px; background:#f1f5f9; border-radius:10px; text-align:center; font-size:14px; font-weight:600; color:#475569;">Raw: 0 / ${this.rubric.criteria.length * this.rubric.maxScore} &nbsp;|&nbsp; Weighted: 0% &nbsp;|&nbsp; Grade: &mdash;</div>`;
                 html += `<div style="display:flex; gap:8px; margin-top:8px;">`;
                 html += `<button class="save-group-btn" data-group-index="${actualIndex}" style="flex:1;">Submit Vote</button>`;
-                if (evalData.scores) {
+                if (evalData.scores && window.app && window.app.isTeacher) {
                     html += `<button class="btn btn-danger delete-eval-btn" data-group="${actualIndex}" style="flex:0 0 auto; padding:10px 16px; font-size:13px; width:auto;">Delete</button>`;
                 }
                 html += `</div></div>`;

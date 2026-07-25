@@ -15,6 +15,7 @@ class App {
         this.groupPanel = new GroupPanel(this.groups, this.storage);
         this.resultsPanel = new ResultsPanel(this.auth, this.groups, this.evaluations, this.exportService);
         this.resultsPanel.setStorage(this.storage);
+        this.dashboardPanel = new DashboardPanel(this);
 
         this.currentVoter = null;
         this.voters = this.storage.loadVoters();
@@ -54,6 +55,7 @@ class App {
                 document.getElementById('loginOverlay').style.display = 'none';
                 document.getElementById('logoutBtn').style.display = '';
                 this._applyRoleVisibility();
+                this.dashboardPanel.render();
             } else if (data.type === 'student' && data.name) {
                 if (data.name.toLowerCase() === 'merry jay tumulak') data.name = 'merry jay tumulak';
                 this.currentVoter = data.name;
@@ -157,6 +159,7 @@ class App {
             logoutBtn.style.display = '';
             this._applyRoleVisibility();
             if (!isMerry) this._refreshStudentEvals();
+            else this.dashboardPanel.render();
         };
 
         document.getElementById('voterLoginBtn').addEventListener('click', studentLogin);
@@ -172,6 +175,7 @@ class App {
             overlay.style.display = 'none';
             logoutBtn.style.display = '';
             this._applyRoleVisibility();
+            this.dashboardPanel.render();
         };
 
         document.getElementById('teacherLoginBtn').addEventListener('click', teacherLogin);
@@ -200,7 +204,6 @@ class App {
             }
         } catch (e) {}
         if (window.app.resultsPanel) window.app.resultsPanel.showPasswordPrompt();
-        if (window.app._renderVoters) window.app._renderVoters();
     }
 
     async _refreshStudentEvals() {
@@ -214,12 +217,7 @@ class App {
         this.evaluationPanel.buildGrid();
         if (this.tabManager) {
             const active = this.tabManager.activeTab;
-            if (active === 'voters') this._renderVoters();
         }
-    }
-
-    _setupTabListeners() {
-
     }
 
     _findVoterGroup() {
@@ -239,17 +237,18 @@ class App {
     _applyRoleVisibility() {
         this.tabManager.tabs.forEach(tab => {
             const tabId = tab.dataset.tab;
-            if (tabId === 'evaluate') return;
-            if (tabId === 'groups') return;
-            if (tabId === 'setup') return;
             if (this.isTeacher) {
                 tab.style.display = '';
             } else {
-                tab.style.display = 'none';
+                if (tabId === 'evaluate') {
+                    tab.style.display = '';
+                } else {
+                    tab.style.display = 'none';
+                }
             }
         });
         if (this.isTeacher) {
-            this.tabManager.switch('setup');
+            this.tabManager.switch('dashboard');
         } else {
             this.tabManager.switch('evaluate');
         }
@@ -338,6 +337,9 @@ class App {
         if (this._resultsInterval) {
             clearInterval(this._resultsInterval);
             this._resultsInterval = null;
+        }
+        if (tabId === 'dashboard') {
+            this.dashboardPanel.render();
         }
         if (tabId === 'setup') {
             if (!this.isTeacher) {
@@ -431,6 +433,9 @@ class App {
                     if (active === 'voters') {
                         this.evaluations.fromJSON(raw);
                         this._renderVoters();
+                    }
+                    if (active === 'dashboard') {
+                        this.dashboardPanel.render();
                     }
                 }
             }

@@ -605,15 +605,21 @@
     </header>
 
     <div class="tabs">
-        <button class="tab active" data-tab="setup">Rubric Setup</button>
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="setup">Rubric Setup</button>
         <button class="tab" data-tab="groups">Groups</button>
         <button class="tab" data-tab="evaluate">Evaluate</button>
         <button class="tab" data-tab="voters">Voters</button>
         <button class="tab" data-tab="results">Results</button>
     </div>
 
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard" class="tab-content">
+        <div id="dashboardContent"></div>
+    </div>
+
     <!-- SETUP TAB -->
-    <div id="tab-setup" class="tab-content active">
+    <div id="tab-setup" class="tab-content">
         <div class="card" style="padding:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <h2 style="margin:0; border:none; padding:0; font-size:15px;">Rubric Configuration</h2>
@@ -847,6 +853,7 @@
 <script src="js/services/ExportService.js"></script>
 <script src="js/ui/TabManager.js"></script>
 <script src="js/ui/GroupNavigator.js"></script>
+<script src="js/ui/DashboardPanel.js"></script>
 <script src="js/ui/SetupPanel.js"></script>
 <script src="js/ui/GroupPanel.js"></script>
 <script src="js/ui/EvaluationPanel.js"></script>
