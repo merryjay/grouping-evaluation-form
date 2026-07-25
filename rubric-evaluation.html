@@ -566,8 +566,8 @@
     <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
     <p style="font-size:13px;color:#64748b;margin-bottom:24px;">Who are you?</p>
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <button id="chooseStudentBtn" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
-      <button id="chooseTeacherBtn" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
+      <button id="chooseStudentBtn" onclick="showStudentLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
+      <button id="chooseTeacherBtn" onclick="showTeacherLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
     </div>
   </div>
 
@@ -844,6 +844,9 @@
 <script src="js/ui/EvaluationPanel.js"></script>
 <script src="js/ui/ResultsPanel.js"></script>
 <script>
+function showStudentLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', true); showElem('loginTeacherPw', false); var inp = document.getElementById('voterNameInput'); if(inp) inp.focus(); }
+function showTeacherLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', false); showElem('loginTeacherPw', true); var inp = document.getElementById('teacherPasswordInput'); if(inp) inp.focus(); }
+function showElem(id, show) { var el = document.getElementById(id); if(el) el.style.display = show ? 'block' : 'none'; }
 function logoutUser() {
     localStorage.removeItem('rubricLoggedInUser');
     localStorage.removeItem('rubricDeviceName');
