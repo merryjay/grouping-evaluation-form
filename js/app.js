@@ -91,6 +91,8 @@ class App {
             rolePicker.style.display = 'none';
             nameInputDiv.style.display = 'block';
             teacherPwDiv.style.display = 'none';
+            document.getElementById('loginError').style.display = 'none';
+            document.getElementById('loginError').textContent = 'Please enter your name.';
             document.getElementById('voterNameInput').focus();
         };
         const showTeacherPw = () => {
@@ -211,10 +213,10 @@ class App {
             if (groups && groups.length > 0) {
                 localStorage.setItem('pbGroups', JSON.stringify(groups));
                 this.groups.fromJSON(groups);
+                this._ensureDefaultMembers();
                 this.groupPanel.buildList();
             }
         } catch (e) {}
-        if (window.app.resultsPanel) window.app.resultsPanel.showPasswordPrompt();
     }
 
     async _refreshStudentEvals() {
