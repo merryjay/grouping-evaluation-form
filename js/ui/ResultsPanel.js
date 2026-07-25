@@ -15,7 +15,13 @@ class ResultsPanel {
         };
     }
 
-    showPasswordPrompt() {
+    showPasswordPrompt(freshEvals = null) {
+        if (window.app && window.app.isTeacher) {
+            this.el.passwordCard.style.display = 'none';
+            this.el.lockedContent.style.display = 'block';
+            this.render(freshEvals);
+            return;
+        }
         this.el.passwordCard.style.display = 'block';
         this.el.lockedContent.style.display = 'none';
         this.el.passwordInput.value = '';
@@ -33,21 +39,24 @@ class ResultsPanel {
         }
     }
 
-    render() {
-        const entries = this.evaluations.getAllEntries();
-        if (entries.length === 0) {
+    render(freshEvals = null) {
+        const evals = freshEvals || this.evaluations;
+        const aggregated = evals.getAggregatedByGroup();
+        const allEntries = evals.getAllEntries();
+
+        if (aggregated.length === 0) {
             this.el.resultsContent.innerHTML = '<div class="empty-state"><p>No evaluations yet.</p></div>';
             this.el.classStats.innerHTML = '';
             return;
         }
 
-        entries.sort((a, b) => b.totalWeighted - a.totalWeighted);
+        aggregated.sort((a, b) => b.totalWeighted - a.totalWeighted);
 
         let html = `<div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
             <table class="results-table">
-            <tr><th>#</th><th>Group</th><th>Raw Total</th><th>Weighted %</th><th>Grade</th><th>Date</th><th>Action</th></tr>`;
+            <tr><th>#</th><th>Group</th><th>Total Raw</th><th>Final Weighted %</th><th>Voters</th><th>Actions</th></tr>`;
 
-        entries.forEach((r, i) => {
+        aggregated.forEach((r, i) => {
             const rankClass = i < 3 ? `rank-${i + 1}` : '';
             const group = this.groups.get(r.groupIndex);
             const groupName = group ? group.name : `Group ${r.groupIndex + 1}`;
@@ -56,46 +65,85 @@ class ResultsPanel {
                 <td><strong>${groupName}</strong></td>
                 <td>${r.totalRaw}</td>
                 <td>${r.totalWeighted}%</td>
-                <td><span class="grade-badge grade-${r.grade.charAt(0)}">${r.grade}</span></td>
-                <td>${r.date}</td>
-                <td><button class="btn btn-danger delete-eval-btn" data-group="${r.groupIndex}" style="padding:6px 10px;font-size:11px;width:auto">Delete</button></td>
+                <td>${r.scoreCount}</td>
+                <td>
+                    <button class="btn btn-sm toggle-stats-btn" data-group="${r.groupIndex}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
+                    <button class="btn btn-danger delete-eval-btn" data-group="${r.groupIndex}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
+                </td>
             </tr>`;
+            html += `<tr id="stats-row-${r.groupIndex}" style="display:none;"><td colspan="6" style="padding:12px;background:#f8fafc;">
+                <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px;">Average Scores per Criterion</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;">`;
+            const rubric = window.app ? window.app.rubric : null;
+            for (const [crit, avg] of Object.entries(r.scores)) {
+                const critConfig = rubric ? rubric.criteria.find(c => c.name === crit) : null;
+                const weight = critConfig ? critConfig.weight : '';
+                html += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
+                    <div style="font-size:11px;color:#64748b;">${crit}${weight ? ` (${weight}%)` : ''}</div>
+                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${avg}</div>
+                </div>`;
+            }
+            html += `</div></td></tr>`;
         });
         html += `</table></div>`;
         this.el.resultsContent.innerHTML = html;
+
+        this.el.resultsContent.querySelectorAll('.toggle-stats-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const gi = btn.dataset.group;
+                const row = document.getElementById(`stats-row-${gi}`);
+                if (row) {
+                    const isVisible = row.style.display !== 'none';
+                    row.style.display = isVisible ? 'none' : 'table-row';
+                    btn.textContent = isVisible ? 'Stats' : 'Hide';
+                }
+            });
+        });
 
         this.el.resultsContent.querySelectorAll('.delete-eval-btn').forEach(btn => {
             btn.addEventListener('click', () => this._deleteEvaluation(parseInt(btn.dataset.group)));
         });
 
-        this._renderStats(entries);
+        this._renderStats(aggregated, allEntries);
     }
 
-    _renderStats(entries) {
-        const avgWeighted = (entries.reduce((s, r) => s + r.totalWeighted, 0) / entries.length).toFixed(1);
-        const highest = Math.max(...entries.map(r => r.totalWeighted));
-        const lowest = Math.min(...entries.map(r => r.totalWeighted));
-        const gradeCounts = {};
-        entries.forEach(r => { gradeCounts[r.grade] = (gradeCounts[r.grade] || 0) + 1; });
+    _showVoterDetails(groupIndex) {
+        const entries = this.evaluations.getAllByGroup(groupIndex);
+        const group = this.groups.get(groupIndex);
+        const groupName = group ? group.name : `Group ${groupIndex + 1}`;
+        if (entries.length === 0) return;
+        let details = entries.map((e, i) =>
+            `${i + 1}. ${e.voter} &mdash; Raw: ${e.totalRaw}, Weighted: ${e.totalWeighted}%, Grade: ${e.grade}`
+        ).join('\n');
+        alert(`Votes for ${groupName}:\n\n${details}`);
+    }
+
+    _renderStats(aggregated, allEntries) {
+        const totalVotes = allEntries.length;
+        const uniqueVoters = new Set(allEntries.map(e => e.voter)).size;
+        const groupsRated = aggregated.length;
+        const totalGroups = this.groups.size();
+        const avgWeighted = aggregated.length > 0 ? (aggregated.reduce((s, r) => s + r.totalWeighted, 0) / aggregated.length).toFixed(1) : 0;
+        const highest = aggregated.length > 0 ? Math.max(...aggregated.map(r => r.totalWeighted)) : 0;
+        const lowest = aggregated.length > 0 ? Math.min(...aggregated.map(r => r.totalWeighted)) : 0;
 
         let statsHtml = `
             <div class="score-display">
-                <div class="score-box blue"><div class="score-value">${entries.length}</div><div class="score-label">Groups</div></div>
-                <div class="score-box green"><div class="score-value">${avgWeighted}%</div><div class="score-label">Average</div></div>
-                <div class="score-box"><div class="score-value">${highest}%</div><div class="score-label">Highest</div></div>
-                <div class="score-box orange"><div class="score-value">${lowest}%</div><div class="score-label">Lowest</div></div>
-            </div>
-            <div style="margin-top:12px">
-                <strong>Grade Distribution:</strong><br>
-                ${Object.keys(gradeCounts).sort().map(g => `<span class="grade-badge grade-${g.charAt(0)}" style="margin:3px">${g}: ${gradeCounts[g]}</span>`).join(' ')}
+                <div class="score-box blue"><div class="score-value">${groupsRated}/${totalGroups}</div><div class="score-label">Groups Rated</div></div>
+                <div class="score-box green"><div class="score-value">${totalVotes}</div><div class="score-label">Total Votes</div></div>
+                <div class="score-box" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);"><div class="score-value">${uniqueVoters}</div><div class="score-label">Total Voters</div></div>
+                <div class="score-box"><div class="score-value">${avgWeighted}%</div><div class="score-label">Class Avg</div></div>
+                <div class="score-box orange"><div class="score-value">${highest}%</div><div class="score-label">Highest</div></div>
             </div>`;
         this.el.classStats.innerHTML = statsHtml;
     }
 
-    _deleteEvaluation(groupIndex) {
-        if (!confirm('Delete this group evaluation?')) return;
+    async _deleteEvaluation(groupIndex) {
+        const group = this.groups.get(groupIndex);
+        if (!confirm(`Clear ALL votes for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
         this.evaluations.delete(groupIndex);
-        this.storage.saveEvaluations(this.evaluations.toJSON());
+        localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
+        await this.storage.pb.deleteEvaluation(groupIndex);
         this.render();
     }
 
@@ -103,10 +151,10 @@ class ResultsPanel {
         this.storage = storage;
     }
 
-    clearAll() {
+    async clearAll() {
         if (!confirm('Clear ALL evaluations? This cannot be undone.')) return;
         this.evaluations.clearAll();
-        this.storage.saveEvaluations(this.evaluations.toJSON());
+        await this.storage.saveEvaluations(this.evaluations.toJSON());
         this.render();
     }
 

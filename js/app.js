@@ -16,22 +16,243 @@ class App {
         this.resultsPanel = new ResultsPanel(this.auth, this.groups, this.evaluations, this.exportService);
         this.resultsPanel.setStorage(this.storage);
 
+        this.currentVoter = null;
+        this.voters = this.storage.loadVoters();
+        this.isTeacher = false;
+        this.voterGroupIndex = null;
+
         window.app = this;
     }
 
-    init() {
+    async init() {
+        await this.storage.init();
         this._loadData();
+        this.voters = this.storage.loadVoters();
         this._ensureDefaultMembers();
-        this._setupTabListeners();
-        this._setupGlobalListeners();
         this.setupPanel.loadRubricIntoUI();
         this.groupPanel.buildList();
+        this._setupLogin();
+        this._setupTabListeners();
+        this._setupGlobalListeners();
+        this._autoLogin();
 
         if (this.evaluations.size() > 0) {
             this.evaluationPanel.buildGrid();
         }
 
         this.rubric.activityName = document.getElementById('activityName').value;
+    }
+
+    _autoLogin() {
+        const saved = localStorage.getItem('rubricLoggedInUser');
+        if (!saved) return;
+        try {
+            const data = JSON.parse(saved);
+            if (data.type === 'teacher') {
+                this.isTeacher = true;
+                this.currentVoter = null;
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = '';
+                this._applyRoleVisibility();
+            } else if (data.type === 'student' && data.name) {
+                if (data.name.toLowerCase() === 'merry jay tumulak') data.name = 'merry jay tumulak';
+                this.currentVoter = data.name;
+                this.isTeacher = false;
+                const existing = this.voters.find(v => v.name.toLowerCase() === data.name.toLowerCase());
+                if (existing) {
+                    existing.loggedIn = true;
+                } else {
+                    this.voters.push({ name: data.name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                }
+                this.storage.saveVoters(this.voters);
+                this._findVoterGroup();
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = '';
+                this._applyRoleVisibility();
+                this.evaluationPanel.buildGrid();
+            }
+        } catch (e) {}
+    }
+
+    _setupLogin() {
+        const overlay = document.getElementById('loginOverlay');
+        const studentDiv = document.getElementById('studentLogin');
+        const teacherDiv = document.getElementById('teacherLogin');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        this._doLogout = () => {
+            const wasVoter = this.currentVoter;
+            localStorage.removeItem('rubricLoggedInUser');
+            localStorage.removeItem('rubricDeviceName');
+            this.currentVoter = null;
+            this.isTeacher = false;
+            this.voterGroupIndex = null;
+            if (wasVoter) {
+                const v = this.voters.find(x => x.name.toLowerCase() === wasVoter.toLowerCase());
+                if (v) { v.loggedIn = false; this.storage.saveVoters(this.voters); }
+            }
+            this.evaluations.clearAll();
+            logoutBtn.style.display = 'none';
+            document.getElementById('voterNameInput').value = '';
+            document.getElementById('teacherPasswordInput').value = '';
+            document.getElementById('loginError').style.display = 'none';
+            document.getElementById('teacherLoginError').style.display = 'none';
+            showStudent();
+            overlay.style.display = 'flex';
+        };
+
+        const showStudent = () => { studentDiv.style.display = 'block'; teacherDiv.style.display = 'none'; document.getElementById('voterNameInput').focus(); };
+        const showTeacher = () => { studentDiv.style.display = 'none'; teacherDiv.style.display = 'block'; document.getElementById('teacherPasswordInput').focus(); };
+
+        document.getElementById('showTeacherLoginBtn').addEventListener('click', showTeacher);
+        document.getElementById('showStudentLoginBtn').addEventListener('click', showStudent);
+
+        const _matchGroupMember = (raw) => {
+            const lower = raw.toLowerCase();
+            const all = this.groups.getAll();
+            for (let i = 0; i < all.length; i++) {
+                for (const m of this.groups.getMemberList(i)) {
+                    const ml = m.toLowerCase();
+                    if (ml === lower || ml.startsWith(lower + ' ') || ml.endsWith(' ' + lower)) return m;
+                }
+            }
+            return null;
+        };
+
+        const studentLogin = async () => {
+            const raw = document.getElementById('voterNameInput').value.trim();
+            if (!raw) { document.getElementById('loginError').style.display = 'block'; return; }
+            const isMerry = raw.toLowerCase() === 'merry jay tumulak';
+
+            await this._freshSync();
+
+            if (isMerry) var name = 'merry jay tumulak';
+            else {
+                const matched = _matchGroupMember(raw);
+                if (!matched) {
+                    document.getElementById('loginError').textContent = 'Your name is not listed in any group.';
+                    document.getElementById('loginError').style.display = 'block';
+                    return;
+                }
+                name = matched;
+            }
+            const existing = this.voters.find(v => v.name.toLowerCase() === name.toLowerCase());
+            if (!isMerry && existing && existing.loggedIn) {
+                document.getElementById('loginError').textContent = 'This name is already taken on another device.';
+                document.getElementById('loginError').style.display = 'block';
+                return;
+            }
+            document.getElementById('loginError').style.display = 'none';
+            this.currentVoter = isMerry ? null : name;
+            this.isTeacher = isMerry;
+            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: isMerry ? 'teacher' : 'student', name }));
+            if (!existing) {
+                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+            } else {
+                existing.loggedIn = true;
+            }
+            this.storage.saveVoters(this.voters);
+            if (!isMerry) this._findVoterGroup();
+            overlay.style.display = 'none';
+            logoutBtn.style.display = '';
+            this._applyRoleVisibility();
+            if (!isMerry) this._refreshStudentEvals();
+        };
+
+        document.getElementById('voterLoginBtn').addEventListener('click', studentLogin);
+        document.getElementById('voterNameInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') studentLogin(); });
+
+        const teacherLogin = () => {
+            const pw = document.getElementById('teacherPasswordInput').value;
+            if (pw !== 'VSU2026Admin!') { document.getElementById('teacherLoginError').style.display = 'block'; return; }
+            document.getElementById('teacherLoginError').style.display = 'none';
+            this.currentVoter = null;
+            this.isTeacher = true;
+            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'teacher' }));
+            overlay.style.display = 'none';
+            logoutBtn.style.display = '';
+            this._applyRoleVisibility();
+        };
+
+        document.getElementById('teacherLoginBtn').addEventListener('click', teacherLogin);
+        document.getElementById('teacherPasswordInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') teacherLogin(); });
+    }
+
+    async _freshSync() {
+        try {
+            const [evals, voters, groups] = await Promise.all([
+                this.storage.pb.loadEvaluations(),
+                this.storage.pb.loadVoters(),
+                this.storage.pb.loadGroups()
+            ]);
+            if (evals) {
+                localStorage.setItem('pbEvals', JSON.stringify(evals));
+                this.evaluations.fromJSON(evals);
+            }
+            if (voters) {
+                localStorage.setItem('pbVoters', JSON.stringify(voters));
+                this.voters = voters;
+            }
+            if (groups && groups.length > 0) {
+                localStorage.setItem('pbGroups', JSON.stringify(groups));
+                this.groups.fromJSON(groups);
+                this.groupPanel.buildList();
+            }
+        } catch (e) {}
+        if (window.app.resultsPanel) window.app.resultsPanel.showPasswordPrompt();
+        if (window.app._renderVoters) window.app._renderVoters();
+    }
+
+    async _refreshStudentEvals() {
+        try {
+            const raw = await this.storage.pb.loadEvaluations();
+            if (raw) {
+                localStorage.setItem('pbEvals', JSON.stringify(raw));
+                this.evaluations.fromJSON(raw);
+            }
+        } catch (e) {}
+        this.evaluationPanel.buildGrid();
+        if (this.tabManager) {
+            const active = this.tabManager.activeTab;
+            if (active === 'voters') this._renderVoters();
+        }
+    }
+
+    _setupTabListeners() {
+
+    }
+
+    _findVoterGroup() {
+        this.voterGroupIndex = null;
+        if (!this.currentVoter) return;
+        this.groups.getAll().forEach((g, i) => {
+            const members = this.groups.getMemberList(i);
+            const match = members.some(m =>
+                m.toLowerCase() === this.currentVoter.toLowerCase() ||
+                m.toLowerCase().startsWith(this.currentVoter.toLowerCase() + ' ') ||
+                m.toLowerCase().endsWith(' ' + this.currentVoter.toLowerCase())
+            );
+            if (match) this.voterGroupIndex = i;
+        });
+    }
+
+    _applyRoleVisibility() {
+        this.tabManager.tabs.forEach(tab => {
+            const tabId = tab.dataset.tab;
+            if (tabId === 'evaluate') return;
+            if (tabId === 'groups') return;
+            if (tabId === 'setup') return;
+            if (this.isTeacher) {
+                tab.style.display = '';
+            } else {
+                tab.style.display = 'none';
+            }
+        });
+        if (this.isTeacher) {
+            this.tabManager.switch('setup');
+        } else {
+            this.tabManager.switch('evaluate');
+        }
     }
 
     _loadData() {
@@ -64,44 +285,39 @@ class App {
 
         let changed = false;
 
-        // Group 1
         changed |= addMember(0, 'Nathaniel Rodrigo', true);
         changed |= addMember(0, 'Junna Dag-uman');
         changed |= addMember(0, 'Merry Jay Tumulak');
 
-        // Group 2
         changed |= addMember(1, 'Krizia Nicole Rubio');
         changed |= addMember(1, 'Althea Tanguamos');
         changed |= addMember(1, 'John Alrey Gementiza');
 
-        // Group 3
         changed |= addMember(2, 'Aranas Vince');
         changed |= addMember(2, 'Palangan Lucille Mae');
         changed |= addMember(2, 'Tariao Justine Jean');
 
-        // Group 4
         changed |= addMember(3, 'Kevin Jay Morales');
         changed |= addMember(3, 'Nylvia Apao');
         changed |= addMember(3, 'Rosalden Rabago');
 
-        // Group 5
         changed |= addMember(4, 'James Susas');
         changed |= addMember(4, 'Mark Antolijao');
+        changed |= addMember(4, 'Eirich Dianne Molde');
 
-        // Group 6
         changed |= addMember(5, 'Bal Gestly Labador');
         changed |= addMember(5, 'Elmie Soltes');
         changed |= addMember(5, 'Steven Yoldan');
 
-        // Group 7
         changed |= addMember(6, 'Andrew Sambulan');
         changed |= addMember(6, 'Allan Baguio');
         changed |= addMember(6, 'Archie Jutag');
 
-        // Group 8
         changed |= addMember(7, 'Angel Lou Geografo');
         changed |= addMember(7, 'Juliemar Bartolo');
         changed |= addMember(7, 'Gabriel Salaveria');
+
+        changed |= addMember(8, 'April Gulbin');
 
         if (changed) {
             this.storage.saveGroups(this.groups.toJSON());
@@ -119,7 +335,17 @@ class App {
     }
 
     _onTabSwitch(tabId) {
+        if (this._resultsInterval) {
+            clearInterval(this._resultsInterval);
+            this._resultsInterval = null;
+        }
         if (tabId === 'setup') {
+            if (!this.isTeacher) {
+                document.getElementById('editRubricBtn').style.display = 'none';
+                document.getElementById('setupButtons').style.display = 'none';
+            } else {
+                document.getElementById('editRubricBtn').style.display = '';
+            }
             this.auth.lockSetup();
             this.setupPanel.hidePasswordPrompt();
             this.setupPanel.disableEditing();
@@ -131,10 +357,84 @@ class App {
         if (tabId === 'evaluate') {
             this.evaluationPanel.buildGrid();
         }
+        if (tabId === 'voters') {
+            this._renderVoters();
+        }
+
         if (tabId === 'results') {
             this.auth.lockResults();
-            this.resultsPanel.showPasswordPrompt();
+            this._refreshResults();
+            this._resultsInterval = setInterval(() => this._refreshResults(), 3000);
         }
+    }
+
+    _renderVoters() {
+        const container = document.getElementById('votersList');
+        const allEntries = this.evaluations.getAllEntries();
+        const allMembers = new Map();
+        this.groups.getAll().forEach((g, i) => {
+            const members = this.groups.getMemberList(i);
+            members.forEach(m => {
+                if (!allMembers.has(m)) allMembers.set(m, []);
+                allMembers.get(m).push(i);
+            });
+        });
+        const votersMap = {};
+        allEntries.forEach(e => {
+            if (!votersMap[e.voter]) votersMap[e.voter] = new Set();
+            votersMap[e.voter].add(e.groupIndex);
+        });
+        this.voters.forEach(v => {
+            if (v.ratedGroups && v.ratedGroups.length > 0) {
+                if (!votersMap[v.name]) votersMap[v.name] = new Set();
+                v.ratedGroups.forEach(gi => votersMap[v.name].add(gi));
+            }
+        });
+        const allNames = [...new Set([...allMembers.keys(), ...this.voters.map(v => v.name)])];
+        allNames.sort();
+        if (allNames.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No students found.</p></div>';
+            return;
+        }
+        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Status</th><th>Groups Rated</th><th>Group Names</th></tr>';
+        allNames.forEach((name, i) => {
+            const ratedSet = votersMap[name] || new Set();
+            const votedGroups = [...ratedSet];
+            const hasVoted = votedGroups.length > 0;
+            const statusClass = hasVoted ? 'grade-A' : 'grade-D';
+            const statusText = hasVoted ? 'Voted' : 'Not yet';
+            const groupNames = votedGroups.map(gi => {
+                const g = this.groups.get(gi);
+                return g ? g.name : `Group ${gi + 1}`;
+            }).join(', ');
+            html += `<tr>
+                <td>${i + 1}</td>
+                <td><strong>${name}</strong></td>
+                <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
+                <td>${votedGroups.length} / ${this.groups.size()}</td>
+                <td style="font-size:11px;color:#64748b;">${groupNames || '&mdash;'}</td>
+            </tr>`;
+        });
+        html += '</table></div>';
+        container.innerHTML = html;
+    }
+
+    async _refreshResults() {
+        try {
+            const raw = await this.storage.pb.loadEvaluations();
+            if (raw) {
+                localStorage.setItem('pbEvals', JSON.stringify(raw));
+                const freshEvals = Object.keys(raw).length > 0 ? new EvaluationCollection().fromJSON(raw) : null;
+                this.resultsPanel.showPasswordPrompt(freshEvals);
+                if (this.tabManager) {
+                    const active = this.tabManager.activeTab;
+                    if (active === 'voters') {
+                        this.evaluations.fromJSON(raw);
+                        this._renderVoters();
+                    }
+                }
+            }
+        } catch (e) {}
     }
 
     _setupGlobalListeners() {
@@ -150,11 +450,14 @@ class App {
         document.getElementById('viewResultsBtn').addEventListener('click', () => this.resultsPanel.verifyPassword());
         document.getElementById('clearAllBtn').addEventListener('click', () => this.resultsPanel.clearAll());
         document.getElementById('exportAllBtn').addEventListener('click', () => this.resultsPanel.exportCSV());
-        document.getElementById('exportCSVBtn').addEventListener('click', () => this.resultsPanel.exportCSV());
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) this._refreshResults();
+        });
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const app = new App();
-    app.init();
+    await app.init();
 });

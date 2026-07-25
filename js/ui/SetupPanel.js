@@ -34,6 +34,10 @@ class SetupPanel {
     }
 
     showPasswordPrompt() {
+        if (window.app && window.app.isTeacher) {
+            this._enableEditing();
+            return;
+        }
         this.el.prompt.style.display = 'block';
         this.el.password.focus();
     }
@@ -61,7 +65,7 @@ class SetupPanel {
         this.el.activityName.removeAttribute('readonly');
         this.el.setupButtons.style.display = 'block';
         this.el.editBtn.textContent = 'Editing Unlocked';
-        this.el.editBtn.style.background = '#27ae60';
+        this.el.editBtn.style.cssText = 'padding:2px 6px; font-size:9px; border:none; border-radius:4px; background:linear-gradient(135deg,#10b981,#059669); color:white; cursor:pointer; font-weight:600; white-space:nowrap; line-height:1.4;';
     }
 
     disableEditing() {

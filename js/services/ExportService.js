@@ -12,19 +12,28 @@ class ExportService {
     }
 
     exportAllCSV() {
-        const entries = this.evaluations.getAllEntries();
-        if (entries.length === 0) return null;
+        const aggregated = this.evaluations.getAggregatedByGroup();
+        if (aggregated.length === 0) return null;
 
         const criteriaNames = this.rubricConfig.getCriteriaNames();
-        let csv = 'Rank,Group,' + criteriaNames.join(',') + ',Raw Total,Weighted %,Grade,Date\n';
+        let csv = 'Rank,Group,Votes,' + criteriaNames.join(',') + ',Avg Raw,Avg Weighted %,Date\n';
 
-        entries.sort((a, b) => b.totalWeighted - a.totalWeighted);
+        aggregated.sort((a, b) => b.totalWeighted - a.totalWeighted);
 
-        entries.forEach((r, i) => {
+        aggregated.forEach((r, i) => {
             const group = this.groups.get(r.groupIndex);
             const groupName = group ? group.name : `Group ${r.groupIndex + 1}`;
             const scores = criteriaNames.map(c => r.scores[c] || 0).join(',');
-            csv += `${i + 1},"${groupName}",${scores},${r.totalRaw},${r.totalWeighted}%,${r.grade},${r.date}\n`;
+            csv += `${i + 1},"${groupName}",${r.scoreCount},${scores},${r.totalRaw},${r.totalWeighted}%,${r.date}\n`;
+        });
+
+        csv += '\n\nIndividual Votes\n';
+        csv += 'Group,Voter,Raw Total,Weighted %,Grade\n';
+        const allEntries = this.evaluations.getAllEntries();
+        allEntries.forEach(e => {
+            const group = this.groups.get(e.groupIndex);
+            const groupName = group ? group.name : `Group ${e.groupIndex + 1}`;
+            csv += `"${groupName}",${e.voter},${e.totalRaw},${e.totalWeighted}%,${e.grade}\n`;
         });
 
         return csv;
