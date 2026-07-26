@@ -93,7 +93,53 @@ async function runTests() {
     assert.deepEqual(await emptyDocument.loadVoters(), []);
     assert.equal(Object.keys((await emptyDocument.loadEvaluationsResult()).data).length, 0);
 
-    console.log('PASS: Firebase service initializes public Firestore without Auth and distinguishes unavailable loaders from valid empty data.');
+    const evaluationState = vm.runInContext(`({
+        groups: [{ name: 'Group One', members: 'Alice\\nBob' }],
+        evaluations: {
+            'g:0:Alice': { scores: { Quality: 4 }, totalRaw: 4, totalWeighted: 80, grade: 'A', date: '7/26/2026' },
+            'm:0:Bob:Alice': { scores: { Quality: 4 }, totalRaw: 4, totalWeighted: 80, grade: 'A', date: '7/26/2026' }
+        }
+    })`, context);
+    const mutationSdk = {
+        getFirestore: () => db,
+        doc: () => stateRef,
+        serverTimestamp: () => 'timestamp',
+        getDoc: async () => ({ exists: () => true, data: () => evaluationState }),
+        setDoc: async (ref, data) => { Object.assign(evaluationState, data); },
+        runTransaction: async (receivedDb, update) => {
+            assert.equal(receivedDb, db);
+            await update({
+                get: async () => ({ exists: () => true, data: () => evaluationState }),
+                set: (ref, data) => { Object.assign(evaluationState, data); }
+            });
+        }
+    };
+    const mutationService = new FirebaseService(runtimeConfig, async () => [
+        { getApps: () => [], initializeApp: config => ({ options: config }) },
+        mutationSdk
+    ]);
+    assert.equal(await mutationService.deleteEvaluation(0), true);
+    assert.equal(Object.keys(evaluationState.evaluations).length, 1);
+    assert.equal(await mutationService.deleteMemberEvaluation(0, 'Bob'), true);
+    assert.equal(Object.keys(evaluationState.evaluations).length, 0);
+    assert.equal(await mutationService.clearAllEvaluations(), true);
+    assert.equal(Object.keys(evaluationState.evaluations).length, 0);
+
+    const failedMutation = new FirebaseService(runtimeConfig, async () => [
+        { getApps: () => [], initializeApp: config => ({ options: config }) },
+        {
+            getFirestore: () => db,
+            doc: () => stateRef,
+            serverTimestamp: () => 'timestamp',
+            setDoc: async () => { throw new Error('write denied'); },
+            runTransaction: async () => { throw new Error('transaction denied'); }
+        }
+    ]);
+    assert.equal(await failedMutation.deleteEvaluation(0), false);
+    assert.equal(await failedMutation.deleteMemberEvaluation(0, 'Bob'), false);
+    assert.equal(await failedMutation.clearAllEvaluations(), false);
+
+    console.log('PASS: Firebase service initializes public Firestore, distinguishes unavailable loaders, and reports delete/clear mutation outcomes.');
 }
 
 runTests().catch(error => {

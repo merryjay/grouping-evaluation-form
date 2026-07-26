@@ -220,18 +220,22 @@ class ResultsPanel {
     async _deleteEvaluation(groupIndex) {
         const group = this.groups.get(groupIndex);
         if (!confirm(`Clear ALL group votes for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
-        this.evaluations.deleteGroup(groupIndex);
-        localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
-        await this.storage.remote.deleteEvaluation(groupIndex);
+        const updated = this._updatedEvaluations(evaluations => evaluations.deleteGroup(groupIndex));
+        const cleared = await this.storage.deleteGroupEvaluations(groupIndex, updated.toJSON());
+        if (!cleared) return this._showClearError();
+        this.evaluations.fromJSON(updated.toJSON());
+        this._recordResultsMutation();
         this.render();
     }
 
     async _deleteMemberEvaluation(groupIndex, memberName) {
         const group = this.groups.get(groupIndex);
         if (!confirm(`Clear ALL votes for ${memberName} in ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
-        this.evaluations.deleteMember(groupIndex, memberName);
-        localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
-        await this.storage.remote.deleteMemberEvaluation(groupIndex, memberName);
+        const updated = this._updatedEvaluations(evaluations => evaluations.deleteMember(groupIndex, memberName));
+        const cleared = await this.storage.deleteMemberEvaluations(groupIndex, memberName, updated.toJSON());
+        if (!cleared) return this._showClearError();
+        this.evaluations.fromJSON(updated.toJSON());
+        this._recordResultsMutation();
         this.render();
     }
 
@@ -241,9 +245,27 @@ class ResultsPanel {
 
     async clearAll() {
         if (!confirm('Clear ALL evaluations? This cannot be undone.')) return;
+        const cleared = await this.storage.clearAllEvaluations();
+        if (!cleared) return this._showClearError();
         this.evaluations.clearAll();
-        await this.storage.saveEvaluations(this.evaluations.toJSON());
+        this._recordResultsMutation();
         this.render();
+    }
+
+    _updatedEvaluations(update) {
+        const updated = new EvaluationCollection(this.groups).fromJSON(this.evaluations.toJSON());
+        update(updated);
+        return updated;
+    }
+
+    _recordResultsMutation() {
+        if (window.app && typeof window.app._markResultsMutation === 'function') {
+            window.app._markResultsMutation();
+        }
+    }
+
+    _showClearError() {
+        alert('Could not clear results. Please try again.');
     }
 
     exportCSV() {

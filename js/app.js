@@ -23,6 +23,7 @@ class App {
         this.isTeacher = false;
         this.voterGroupIndex = null;
         this._studentLoginName = null;
+        this._resultsVersion = 0;
 
         window.app = this;
 
@@ -506,8 +507,10 @@ class App {
     }
 
     async _refreshResults() {
+        const refreshVersion = this._resultsVersion || 0;
         try {
             const remoteEvals = await this.storage.remote.loadEvaluationsResult();
+            if (refreshVersion !== (this._resultsVersion || 0)) return;
             if (remoteEvals.available) {
                 localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
                 this.evaluations.fromJSON(remoteEvals.data);
@@ -526,11 +529,19 @@ class App {
         } catch (e) {}
     }
 
+    _markResultsMutation() {
+        this._resultsVersion = (this._resultsVersion || 0) + 1;
+    }
+
     _setupGlobalListeners() {
         document.getElementById('addCriteriaBtn').addEventListener('click', () => this.setupPanel.addCriteria());
         document.getElementById('saveRubricBtn').addEventListener('click', () => this.setupPanel.saveRubric());
 
-        document.getElementById('clearAllBtn').addEventListener('click', () => this.resultsPanel.clearAll());
+        document.getElementById('clearAllBtn').addEventListener('click', () => {
+            Promise.resolve().then(() => this.resultsPanel.clearAll()).catch(() => {
+                alert('Could not clear results. Please try again.');
+            });
+        });
         document.getElementById('exportAllBtn').addEventListener('click', () => this.resultsPanel.exportCSV());
 
         document.addEventListener('visibilitychange', () => {

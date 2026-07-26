@@ -50,8 +50,39 @@ class StorageService {
     }
 
     async saveEvaluations(evaluations) {
-        this._lss('pbEvals', JSON.stringify(evaluations));
-        await this.remote.saveEvaluations(evaluations);
+        return this._persistEvaluations(() => this.remote.saveEvaluations(evaluations), evaluations);
+    }
+
+    async deleteGroupEvaluations(groupIndex, evaluations) {
+        return this._persistEvaluations(() => this.remote.deleteEvaluation(groupIndex), evaluations);
+    }
+
+    async deleteMemberEvaluations(groupIndex, memberName, evaluations) {
+        return this._persistEvaluations(() => this.remote.deleteMemberEvaluation(groupIndex, memberName), evaluations);
+    }
+
+    async clearAllEvaluations() {
+        return this._persistEvaluations(() => this.remote.clearAllEvaluations(), {});
+    }
+
+    async _persistEvaluations(remoteMutation, evaluations) {
+        let remoteAvailable;
+        try {
+            remoteAvailable = await this.remote.init();
+        } catch (e) {
+            remoteAvailable = false;
+        }
+        if (!remoteAvailable) {
+            this._lss('pbEvals', JSON.stringify(evaluations));
+            return true;
+        }
+        try {
+            if (await remoteMutation() !== true) return false;
+            this._lss('pbEvals', JSON.stringify(evaluations));
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 
     loadEvaluations() {
@@ -72,11 +103,11 @@ class StorageService {
         return this._votersCache;
     }
 
-    clearAll() {
+    async clearAll() {
+        if (!await this.clearAllEvaluations()) return false;
         localStorage.removeItem('pbRubric');
         localStorage.removeItem('pbGroups');
-        localStorage.removeItem('pbEvals');
         localStorage.removeItem('pbVoters');
-        this.remote.clearAllEvaluations();
+        return true;
     }
 }

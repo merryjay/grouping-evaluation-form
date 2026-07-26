@@ -30,4 +30,18 @@ const firebaseConfig = JSON.parse(fs.readFileSync(path.join(root, 'firebase.json
 assert.ok(firebaseConfig.hosting.ignore.includes('firestore.rules'));
 assert.ok(firebaseConfig.hosting.ignore.includes('netlify.toml'));
 
-console.log('PASS: Both entry pages share the same password UI and public-data warning; Hosting excludes Firestore rules and Netlify configuration.');
+const cacheControl = 'no-cache, max-age=0, must-revalidate';
+for (const entryPage of ['/', '/index.html', '/rubric-evaluation.html']) {
+    const rule = firebaseConfig.hosting.headers.find(header => header.source === entryPage);
+    assert.ok(rule, `${entryPage} is missing a Hosting header rule`);
+    assert.deepEqual(rule.headers, [{ key: 'Cache-Control', value: cacheControl }]);
+}
+
+const scriptSources = pages.map(({ html }) => [...html.matchAll(/<script\s+src="([^"]+)"/g)].map(match => match[1]));
+assert.equal(scriptSources[0].length, 19);
+assert.deepEqual(scriptSources[0], scriptSources[1]);
+for (const source of scriptSources[0]) {
+    assert.match(source, /^js\/.+\?v=20260726-clear-results-cache-repair$/);
+}
+
+console.log('PASS: Both entry pages share the same password UI, coherent versioned scripts, and no-cache Hosting headers; Hosting excludes Firestore rules and Netlify configuration.');
