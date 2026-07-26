@@ -292,8 +292,10 @@ class App {
     }
 
     _ensureDefaultMembers() {
-        if (!this.groups.get(8)) {
-            this.groups.add({ name: 'Group 9', members: '' });
+        for (let i = 0; i <= 8; i++) {
+            if (!this.groups.get(i)) {
+                this.groups.add({ name: `Group ${i + 1}`, members: '' });
+            }
         }
         const addMember = (groupIndex, name) => {
             const g = this.groups.get(groupIndex);
