@@ -248,6 +248,46 @@ class App {
 
         const savedEvals = this.storage.loadEvaluations();
         if (savedEvals) this.evaluations.fromJSON(savedEvals);
+
+        this._populateMembersFromEvals();
+    }
+
+    _populateMembersFromEvals() {
+        const entries = this.evaluations.getAllEntries();
+        if (entries.length === 0) return;
+
+        const maxGroupIdx = Math.max(...entries.map(e => e.groupIndex));
+        for (let i = 0; i <= maxGroupIdx; i++) {
+            if (!this.groups.get(i)) {
+                this.groups.add({ name: `Group ${i + 1}`, members: '' });
+            }
+        }
+
+        const membersByGroup = {};
+        for (const e of entries) {
+            if (!membersByGroup[e.groupIndex]) membersByGroup[e.groupIndex] = new Set();
+            membersByGroup[e.groupIndex].add(e.voter);
+        }
+        let changed = false;
+        for (const [gi, voters] of Object.entries(membersByGroup)) {
+            const idx = parseInt(gi);
+            const g = this.groups.get(idx);
+            if (!g) continue;
+            const existing = this.groups.getMemberList(idx);
+            const existingSet = new Set(existing);
+            let added = false;
+            for (const v of voters) {
+                if (!existingSet.has(v)) {
+                    existing.push(v);
+                    added = true;
+                }
+            }
+            if (added) {
+                g.members = existing.join('\n');
+                changed = true;
+            }
+        }
+        if (changed) this.storage.saveGroups(this.groups.toJSON());
     }
 
     _setupTabListeners() {
