@@ -172,7 +172,7 @@ class App {
             this.currentVoter = loginName;
             this.isTeacher = false;
             this.voterGroupIndex = null;
-            const existing = this.voters.find(v => v.name === loginName);
+            const existing = this.voters.find(v => v.name.toLowerCase() === loginName.toLowerCase());
             if (!existing) {
                 this.voters.push({ name: loginName, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
             } else {
