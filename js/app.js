@@ -22,6 +22,7 @@ class App {
         this.voters = this.storage.loadVoters();
         this.isTeacher = false;
         this.voterGroupIndex = null;
+        this._studentLoginName = null;
 
         window.app = this;
 
@@ -42,6 +43,7 @@ class App {
             if (tp) tp.style.display = 'none';
         };
         a._showNameInput = () => {
+            this._studentLoginName = null;
             const rp = document.getElementById('loginRolePicker');
             const ni = document.getElementById('loginNameInput');
             const tp = document.getElementById('loginTeacherPw');
@@ -50,8 +52,18 @@ class App {
             if (tp) tp.style.display = 'none';
             const err = document.getElementById('loginError');
             if (err) { err.style.display = 'none'; err.textContent = 'Please enter your name.'; }
+            const pwErr = document.getElementById('studentPwError');
+            if (pwErr) pwErr.style.display = 'none';
+            const pwArea = document.getElementById('studentPwArea');
+            if (pwArea) pwArea.style.display = 'none';
+            const pwInput = document.getElementById('studentPassword');
+            if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Password'; }
+            const confirmInput = document.getElementById('studentConfirmPw');
+            if (confirmInput) { confirmInput.style.display = 'none'; confirmInput.value = ''; }
+            const btn = document.getElementById('voterLoginBtn');
+            if (btn) btn.textContent = 'Enter';
             const inp = document.getElementById('voterNameInput');
-            if (inp) inp.focus();
+            if (inp) { inp.value = ''; inp.focus(); }
         };
         a._showTeacherPw = () => {
             const rp = document.getElementById('loginRolePicker');
@@ -64,6 +76,7 @@ class App {
             if (inp) inp.focus();
         };
         a._doLogout = () => {
+            this._studentLoginName = null;
             const wasVoter = this.currentVoter;
             localStorage.removeItem('rubricLoggedInUser');
             localStorage.removeItem('rubricDeviceName');
@@ -92,11 +105,63 @@ class App {
         a._studentLogin = async () => {
             const nameInput = document.getElementById('voterNameInput');
             const name = nameInput ? nameInput.value.trim() : '';
-            if (!name) {
-                const err = document.getElementById('loginError');
-                if (err) err.style.display = 'block';
+            const err = document.getElementById('loginError');
+            const pwErr = document.getElementById('studentPwError');
+            const pwInput = document.getElementById('studentPassword');
+            const confirmInput = document.getElementById('studentConfirmPw');
+            const pwArea = document.getElementById('studentPwArea');
+            const btn = document.getElementById('voterLoginBtn');
+
+            if (!this._studentLoginName) {
+                if (!name) {
+                    if (err) { err.textContent = 'Please enter your name.'; err.style.display = 'block'; }
+                    return;
+                }
+                if (!this._isNameInMemberList(name)) {
+                    if (err) {
+                        err.textContent = 'Registration failed. Your name is not listed as an official member. Please contact the administrator.';
+                        err.style.display = 'block';
+                    }
+                    return;
+                }
+                if (err) err.style.display = 'none';
+                this._studentLoginName = name;
+                if (pwArea) pwArea.style.display = 'flex';
+                if (this._hasStudentPassword(name)) {
+                    if (confirmInput) confirmInput.style.display = 'none';
+                    if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Enter your password'; pwInput.focus(); }
+                    if (btn) btn.textContent = 'Log In';
+                } else {
+                    if (confirmInput) { confirmInput.style.display = 'block'; confirmInput.value = ''; }
+                    if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Create a password'; pwInput.focus(); }
+                    if (btn) btn.textContent = 'Register';
+                }
                 return;
             }
+
+            const password = pwInput ? pwInput.value : '';
+            if (!password) {
+                if (pwErr) { pwErr.textContent = 'Please enter a password.'; pwErr.style.display = 'block'; }
+                return;
+            }
+            if (this._hasStudentPassword(this._studentLoginName)) {
+                if (!this._checkStudentPassword(this._studentLoginName, password)) {
+                    if (pwErr) { pwErr.textContent = 'Incorrect password. Please try again.'; pwErr.style.display = 'block'; }
+                    return;
+                }
+            } else {
+                const confirm = confirmInput ? confirmInput.value : '';
+                if (password !== confirm) {
+                    if (pwErr) { pwErr.textContent = 'Passwords do not match. Please try again.'; pwErr.style.display = 'block'; }
+                    return;
+                }
+                this._saveStudentPassword(this._studentLoginName, password);
+            }
+            if (pwErr) pwErr.style.display = 'none';
+
+            const loginName = this._studentLoginName;
+            this._studentLoginName = null;
+
             try {
                 const raw = await this.storage.pb.loadEvaluations();
                 if (raw) {
@@ -104,14 +169,12 @@ class App {
                     this.evaluations.fromJSON(raw);
                 }
             } catch (e) {}
-            const err = document.getElementById('loginError');
-            if (err) err.style.display = 'none';
-            this.currentVoter = name;
+            this.currentVoter = loginName;
             this.isTeacher = false;
             this.voterGroupIndex = null;
-            const existing = this.voters.find(v => v.name === name);
+            const existing = this.voters.find(v => v.name === loginName);
             if (!existing) {
-                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                this.voters.push({ name: loginName, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
             } else {
                 existing.loggedIn = true;
             }
@@ -346,6 +409,39 @@ class App {
         changed |= addMember(8, 'April Gulbin');
 
         if (changed) this.storage.saveGroups(this.groups.toJSON());
+    }
+
+    _isNameInMemberList(name) {
+        const nameLower = name.toLowerCase().trim();
+        for (let i = 0; i < this.groups.size(); i++) {
+            const members = this.groups.getMemberList(i);
+            if (members.some(m => m.toLowerCase().trim() === nameLower)) return true;
+        }
+        return false;
+    }
+
+    _getStudentAccounts() {
+        try { return JSON.parse(localStorage.getItem('studentAccounts') || '{}'); } catch { return {}; }
+    }
+
+    _saveStudentAccounts(accounts) {
+        localStorage.setItem('studentAccounts', JSON.stringify(accounts));
+    }
+
+    _hasStudentPassword(name) {
+        const accounts = this._getStudentAccounts();
+        return !!accounts[name.toLowerCase().trim()];
+    }
+
+    _saveStudentPassword(name, password) {
+        const accounts = this._getStudentAccounts();
+        accounts[name.toLowerCase().trim()] = password;
+        this._saveStudentAccounts(accounts);
+    }
+
+    _checkStudentPassword(name, password) {
+        const accounts = this._getStudentAccounts();
+        return accounts[name.toLowerCase().trim()] === password;
     }
 
     _setupTabListeners() {

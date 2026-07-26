@@ -8,29 +8,60 @@ function mockApp() {
         isTeacher: false,
         voterGroupIndex: null,
         voters: [],
+        _studentLoginName: null,
+        _mockPasswords: {},
         storage: {
             saveVoters: () => {}
         },
         _applyRoleVisibility: () => {},
         dashboardPanel: { render: () => {} },
         _refreshStudentEvals: () => {},
-        evaluations: { clearAll: () => {} }
+        evaluations: { clearAll: () => {} },
+        _isNameInMemberList: () => true,
+        _hasStudentPassword(name) {
+            return !!state._mockPasswords[name.toLowerCase().trim()];
+        },
+        _saveStudentPassword(name, password) {
+            state._mockPasswords[name.toLowerCase().trim()] = password;
+        },
+        _checkStudentPassword(name, password) {
+            return state._mockPasswords[name.toLowerCase().trim()] === password;
+        }
     };
 
     state._doLogout = () => {
+        state._studentLoginName = null;
         state.currentVoter = null;
         state.isTeacher = false;
         state.voterGroupIndex = null;
     };
 
-    state._studentLogin = async (name) => {
-        if (!name) return { error: 'no name' };
+    state._completeStudentLogin = (name) => {
         state.currentVoter = name;
         state.isTeacher = false;
+        state.voterGroupIndex = null;
         const existing = state.voters.find(v => v.name === name);
         if (!existing) {
             state.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+        } else {
+            existing.loggedIn = true;
         }
+        state._studentLoginName = null;
+    };
+
+    state._studentLogin = async (name) => {
+        if (!name) return { error: 'no name' };
+        if (!state._studentLoginName) {
+            if (!state._isNameInMemberList(name)) return { error: 'not a member' };
+            state._studentLoginName = name;
+            if (state._hasStudentPassword(name)) return { pending: true, mode: 'login' };
+            return { pending: true, mode: 'register' };
+        }
+        if (name !== state._studentLoginName) {
+            state._completeStudentLogin(name);
+            return { ok: true };
+        }
+        state._completeStudentLogin(name);
         return { ok: true };
     };
 
@@ -90,38 +121,42 @@ async function runTests() {
         assert.equal(app.isTeacher, false);
     });
 
-    // 2. Student login validation
+    // 2. Student login validation (two-step flow: name check → password)
     test('student login rejects empty name', async () => {
         const app = mockApp();
         const result = await app._studentLogin('');
         assert.equal(result.error, 'no name');
     });
 
-    test('student login accepts valid name', async () => {
+    test('student login accepts valid name (two-step)', async () => {
         const app = mockApp();
-        const result = await app._studentLogin('John Doe');
-        assert.equal(result.ok, true);
+        const step1 = await app._studentLogin('John Doe');
+        assert.equal(step1.pending, true);
+        const step2 = await app._studentLogin('John Doe');
+        assert.equal(step2.ok, true);
         assert.equal(app.currentVoter, 'John Doe');
         assert.equal(app.isTeacher, false);
     });
 
-    test('student login records new voter', async () => {
+    test('student login records new voter (two-step)', async () => {
         const app = mockApp();
+        await app._studentLogin('Alice');
         await app._studentLogin('Alice');
         assert.equal(app.voters.length, 1);
         assert.equal(app.voters[0].name, 'Alice');
         assert.equal(app.voters[0].loggedIn, true);
     });
 
-    test('student login does not duplicate existing voter', async () => {
+    test('student login does not duplicate existing voter (two-step)', async () => {
         const app = mockApp();
         app.voters.push({ name: 'Bob', hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: false });
+        await app._studentLogin('Bob');
         await app._studentLogin('Bob');
         assert.equal(app.voters.length, 1);
         assert.equal(app.voters[0].loggedIn, true);
     });
 
-    test('student login trims whitespace', async () => {
+    test('student login first step trims whitespace', async () => {
         const app = mockApp();
         const result = await app._studentLogin('   ');
         assert.equal(result.error, 'no name');
@@ -137,9 +172,10 @@ async function runTests() {
         assert.equal(app.currentVoter, null);
     });
 
-    test('logout resets student state', () => {
+    test('logout resets student state', async () => {
         const app = mockApp();
-        app._studentLogin('Charlie');
+        await app._studentLogin('Charlie');
+        await app._studentLogin('Charlie');
         assert.equal(app.currentVoter, 'Charlie');
         app._doLogout();
         assert.equal(app.isTeacher, false);
@@ -158,6 +194,7 @@ async function runTests() {
     test('student login clears isTeacher', async () => {
         const app = mockApp();
         app.isTeacher = true;
+        await app._studentLogin('Eve');
         await app._studentLogin('Eve');
         assert.equal(app.isTeacher, false);
         assert.equal(app.currentVoter, 'Eve');

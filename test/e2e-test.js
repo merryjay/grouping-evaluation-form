@@ -65,12 +65,20 @@ async function run() {
         if (await overlay.isVisible()) ok('Logout returns to overlay');
         else fail('Logout returns to overlay', 'not visible');
 
-        // 6. Student login via click
+        // 6. Student login via click (two-step: name check -> register password)
         await page.click('#chooseStudentBtn');
         await page.waitForTimeout(300);
-        await page.fill('#voterNameInput', 'TestUser');
+        await page.fill('#voterNameInput', 'Nathaniel Rodrigo');
         await page.click('#voterLoginBtn');
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(500);
+        // Step 2: enter password and confirm, then click Register
+        const pwArea = page.locator('#studentPwArea');
+        if (await pwArea.isVisible()) {
+            await page.fill('#studentPassword', 'test123');
+            await page.fill('#studentConfirmPw', 'test123');
+            await page.click('#voterLoginBtn');
+            await page.waitForTimeout(500);
+        }
         if (!await overlay.isVisible()) ok('Student login works');
         else fail('Student login works', 'overlay still visible');
 

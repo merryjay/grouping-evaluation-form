@@ -573,12 +573,17 @@
 
   <div id="loginNameInput" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
     <h2 style="margin:0 0 6px;color:#1e293b;">Student Evaluation</h2>
-    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name to start evaluating groups.</p>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name to register or log in.</p>
     <div style="display:flex;flex-direction:column;gap:10px;">
       <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
+      <div id="studentPwArea" style="display:none;flex-direction:column;gap:8px;">
+        <input type="password" id="studentPassword" placeholder="Password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
+        <input type="password" id="studentConfirmPw" placeholder="Confirm password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
+      </div>
       <button id="voterLoginBtn" onclick="var a=window.app;if(a&&a._studentLogin)a._studentLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
     </div>
     <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
+    <p id="studentPwError" style="color:#e74c3c;font-size:12px;margin-top:6px;display:none;"></p>
     <div style="margin-top:12px;">
       <button id="backToRolePickerBtn" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
     </div>
