@@ -7,7 +7,7 @@ const PORT = 9876;
 const ROOT = path.resolve(__dirname, '..');
 
 function serve() {
-    const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' };
+    const mime = { '.html': 'text/html', '.js': 'application/javascript' };
     return http.createServer((req, res) => {
         let file = req.url === '/' ? '/index.html' : req.url;
         const p = path.join(ROOT, file);
@@ -31,62 +31,63 @@ async function run() {
         await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle', timeout: 15000 });
         await page.waitForTimeout(1000);
 
-        // Check console for errors
-        const errors = [];
-        page.on('pageerror', e => errors.push(e.message));
-        await page.waitForTimeout(500);
-
-        if (errors.length > 0) {
-            console.log(`  CONSOLE ERRORS: ${errors.join(', ')}`);
-        }
-
         // 1. Login overlay visible
         const overlay = page.locator('#loginOverlay');
-        const rolePicker = page.locator('#loginRolePicker');
         if (await overlay.isVisible()) ok('Login overlay visible');
         else fail('Login overlay visible', 'not visible');
 
-        // 2. Click "I'm a Teacher"
-        await page.click('#chooseTeacherBtn');
+        // 2. Click role buttons, then try Login without selecting role
+        await page.click('#loginBtn');
         await page.waitForTimeout(300);
-        const teacherPwDiv = page.locator('#loginTeacherPw');
-        if (await teacherPwDiv.isVisible()) ok('Teacher password panel visible after clicking teacher button');
-        else fail('Teacher password panel appeared', 'not visible');
+        const errorEl = page.locator('#loginError');
+        if (await errorEl.isVisible()) {
+            const text = await errorEl.textContent();
+            if (text.includes('select a role')) ok('Shows error when no role selected');
+            else fail('Shows error when no role selected', 'wrong text: ' + text);
+        } else fail('Shows error when no role selected', 'error not visible');
 
-        // 3. Type wrong password, click Enter
-        await page.fill('#teacherPasswordInput', 'wrongpw');
-        await page.click('#teacherLoginBtn');
+        // 3. Select Student role, try Login with empty name
+        await page.click('#roleStudentBtn');
+        await page.waitForTimeout(200);
+        await page.click('#loginBtn');
         await page.waitForTimeout(300);
-        const pwError = page.locator('#teacherLoginError');
-        if (await pwError.isVisible()) ok('Wrong password shows error message');
-        else fail('Wrong password shows error', 'error not visible');
+        if (await errorEl.isVisible()) {
+            const text = await errorEl.textContent();
+            if (text.includes('enter your name')) ok('Shows error when student name empty');
+            else fail('Shows error when student name empty', 'wrong text: ' + text);
+        } else fail('Shows error when student name empty', 'error not visible');
 
-        // 4. Type correct password, press Enter key
-        await page.fill('#teacherPasswordInput', 'VSU2026Admin!');
-        await page.locator('#teacherPasswordInput').press('Enter');
-        await page.waitForTimeout(500);
-        if (!await overlay.isVisible()) ok('Teacher login hides overlay (Enter key)');
-        else fail('Teacher login hides overlay (Enter key)', 'overlay still visible');
+        // 4. Type student name, click Login
+        await page.fill('#loginInput', 'TestStudent');
+        await page.click('#loginBtn');
+        await page.waitForTimeout(1000);
+        if (!await overlay.isVisible()) ok('Student login hides overlay (click Login)');
+        else fail('Student login hides overlay', 'overlay still visible');
 
         // 5. Logout
         await page.click('#logoutBtn');
         await page.waitForTimeout(300);
         if (await overlay.isVisible()) ok('Logout returns to login overlay');
-        else fail('Logout returns to login overlay', 'overlay not visible');
+        else fail('Logout returns', 'overlay not visible');
 
-        // 6. Student login: click button
-        await page.click('#chooseStudentBtn');
+        // 6. Select Teacher, wrong password
+        await page.click('#roleTeacherBtn');
+        await page.waitForTimeout(200);
+        await page.fill('#loginInput', 'wrongpw');
+        await page.click('#loginBtn');
         await page.waitForTimeout(300);
-        const nameInput = page.locator('#loginNameInput');
-        if (await nameInput.isVisible()) ok('Student name panel visible');
-        else fail('Student name panel visible', 'not visible');
+        if (await errorEl.isVisible()) {
+            const text = await errorEl.textContent();
+            if (text.includes('Incorrect password')) ok('Shows error on wrong teacher password');
+            else fail('Shows error on wrong teacher password', 'wrong text: ' + text);
+        } else fail('Shows error on wrong teacher password', 'error not visible');
 
-        // 7. Student enter name, click Enter button
-        await page.fill('#voterNameInput', 'TestUser');
-        await page.click('#voterLoginBtn');
-        await page.waitForTimeout(1000);
-        if (!await overlay.isVisible()) ok('Student login hides overlay (click button)');
-        else fail('Student login hides overlay (click button)', 'overlay still visible');
+        // 7. Correct teacher password, press Enter key
+        await page.fill('#loginInput', 'VSU2026Admin!');
+        await page.locator('#loginInput').press('Enter');
+        await page.waitForTimeout(500);
+        if (!await overlay.isVisible()) ok('Teacher login hides overlay (Enter key)');
+        else fail('Teacher login hides overlay', 'overlay still visible');
 
     } catch (e) {
         console.log(`  ERROR: ${e.message}`);

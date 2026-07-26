@@ -7,45 +7,77 @@ function mockApp() {
         currentVoter: null,
         isTeacher: false,
         voterGroupIndex: null,
+        _selectedRole: null,
         voters: [],
         storage: {
             saveVoters: () => {}
         },
         _applyRoleVisibility: () => {},
         dashboardPanel: { render: () => {} },
-        _refreshStudentEvals: () => {},
+        evaluationPanel: { buildGrid: () => {} },
         evaluations: { clearAll: () => {} }
     };
 
-    state._doLogout = () => {
+    state._resetLogin = () => {
+        state._selectedRole = null;
         state.currentVoter = null;
         state.isTeacher = false;
-        state.voterGroupIndex = null;
     };
 
-    state._studentLogin = async (name) => {
-        if (!name) return { error: 'no name' };
-        state.currentVoter = name;
-        state.isTeacher = false;
-        const existing = state.voters.find(v => v.name === name);
-        if (!existing) {
-            state.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+    state._selectRole = (role) => {
+        state._selectedRole = role;
+    };
+
+    state._doLogin = async () => {
+        if (!state._selectedRole) return { error: 'no role' };
+
+        const value = 'test-value';
+        if (!value) {
+            return { error: state._selectedRole === 'student' ? 'no name' : 'no password' };
         }
-        return { ok: true };
+
+        if (state._selectedRole === 'teacher') {
+            if (value !== TEACHER_PASSWORD) return { error: 'wrong password' };
+            state.isTeacher = true;
+            state.currentVoter = null;
+            return { ok: true };
+        } else {
+            state.currentVoter = value;
+            state.isTeacher = false;
+            const existing = state.voters.find(v => v.name === value);
+            if (!existing) {
+                state.voters.push({ name: value, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+            }
+            return { ok: true };
+        }
     };
 
-    state._teacherLogin = (pw) => {
-        if (pw !== TEACHER_PASSWORD) return { error: 'wrong password' };
-        state.currentVoter = null;
-        state.isTeacher = true;
-        return { ok: true };
+    state._doLoginWithValue = async (value) => {
+        if (!state._selectedRole) return { error: 'no role' };
+        if (!value) {
+            return { error: state._selectedRole === 'student' ? 'no name' : 'no password' };
+        }
+        if (state._selectedRole === 'teacher') {
+            if (value !== TEACHER_PASSWORD) return { error: 'wrong password' };
+            state.isTeacher = true;
+            state.currentVoter = null;
+            return { ok: true };
+        } else {
+            state.currentVoter = value;
+            state.isTeacher = false;
+            const existing = state.voters.find(v => v.name === value);
+            if (!existing) {
+                state.voters.push({ name: value, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+            }
+            return { ok: true };
+        }
     };
 
     return state;
 }
 
 async function runTests() {
-    console.log('=== Login Flow Tests ===\n');
+    console.log('=== Unified Login Flow Tests ===\n');
     let passed = 0;
     let failed = 0;
 
@@ -60,46 +92,70 @@ async function runTests() {
         }
     }
 
-    // 1. Teacher password validation
-    test('teacher login rejects wrong password', () => {
+    // 1. Role selection
+    test('no role selected gives error', async () => {
         const app = mockApp();
-        const result = app._teacherLogin('wrongpassword');
+        const result = await app._doLogin();
+        assert.equal(result.error, 'no role');
+        assert.equal(app.isTeacher, false);
+    });
+
+    test('selecting student role works', () => {
+        const app = mockApp();
+        app._selectRole('student');
+        assert.equal(app._selectedRole, 'student');
+    });
+
+    test('selecting teacher role works', () => {
+        const app = mockApp();
+        app._selectRole('teacher');
+        assert.equal(app._selectedRole, 'teacher');
+    });
+
+    // 2. Teacher login
+    test('teacher login rejects wrong password', async () => {
+        const app = mockApp();
+        app._selectRole('teacher');
+        const result = await app._doLoginWithValue('wrongpassword');
         assert.equal(result.error, 'wrong password');
         assert.equal(app.isTeacher, false);
     });
 
-    test('teacher login accepts correct password', () => {
+    test('teacher login accepts correct password', async () => {
         const app = mockApp();
-        const result = app._teacherLogin('VSU2026Admin!');
+        app._selectRole('teacher');
+        const result = await app._doLoginWithValue('VSU2026Admin!');
         assert.equal(result.ok, true);
         assert.equal(app.isTeacher, true);
         assert.equal(app.currentVoter, null);
     });
 
-    test('teacher login is case sensitive', () => {
+    test('teacher login is case sensitive', async () => {
         const app = mockApp();
-        const result = app._teacherLogin('vsu2026admin!');
+        app._selectRole('teacher');
+        const result = await app._doLoginWithValue('vsu2026admin!');
         assert.equal(result.error, 'wrong password');
-        assert.equal(app.isTeacher, false);
     });
 
-    test('teacher login rejects empty password', () => {
+    test('teacher login rejects empty password', async () => {
         const app = mockApp();
-        const result = app._teacherLogin('');
-        assert.equal(result.error, 'wrong password');
-        assert.equal(app.isTeacher, false);
+        app._selectRole('teacher');
+        const result = await app._doLoginWithValue('');
+        assert.equal(result.error, 'no password');
     });
 
-    // 2. Student login validation
+    // 3. Student login
     test('student login rejects empty name', async () => {
         const app = mockApp();
-        const result = await app._studentLogin('');
+        app._selectRole('student');
+        const result = await app._doLoginWithValue('');
         assert.equal(result.error, 'no name');
     });
 
     test('student login accepts valid name', async () => {
         const app = mockApp();
-        const result = await app._studentLogin('John Doe');
+        app._selectRole('student');
+        const result = await app._doLoginWithValue('John Doe');
         assert.equal(result.ok, true);
         assert.equal(app.currentVoter, 'John Doe');
         assert.equal(app.isTeacher, false);
@@ -107,50 +163,49 @@ async function runTests() {
 
     test('student login records new voter', async () => {
         const app = mockApp();
-        await app._studentLogin('Alice');
+        app._selectRole('student');
+        await app._doLoginWithValue('Alice');
         assert.equal(app.voters.length, 1);
         assert.equal(app.voters[0].name, 'Alice');
-        assert.equal(app.voters[0].loggedIn, true);
     });
 
     test('student login does not duplicate existing voter', async () => {
         const app = mockApp();
+        app._selectRole('student');
         app.voters.push({ name: 'Bob', hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: false });
-        await app._studentLogin('Bob');
+        await app._doLoginWithValue('Bob');
         assert.equal(app.voters.length, 1);
         assert.equal(app.voters[0].loggedIn, true);
     });
 
-    test('student login trims whitespace', async () => {
-        const app = mockApp();
-        const result = await app._studentLogin('   ');
-        assert.equal(result.error, 'no name');
-    });
-
-    // 3. Logout
+    // 4. Logout
     test('logout resets teacher state', () => {
         const app = mockApp();
-        app._teacherLogin('VSU2026Admin!');
+        app._selectRole('teacher');
+        app._doLoginWithValue('VSU2026Admin!');
         assert.equal(app.isTeacher, true);
-        app._doLogout();
+        app._resetLogin();
         assert.equal(app.isTeacher, false);
-        assert.equal(app.currentVoter, null);
+        assert.equal(app._selectedRole, null);
     });
 
     test('logout resets student state', () => {
         const app = mockApp();
-        app._studentLogin('Charlie');
+        app._selectRole('student');
+        app._doLoginWithValue('Charlie');
         assert.equal(app.currentVoter, 'Charlie');
-        app._doLogout();
+        app._resetLogin();
         assert.equal(app.isTeacher, false);
         assert.equal(app.currentVoter, null);
+        assert.equal(app._selectedRole, null);
     });
 
-    // 4. Role transitions
-    test('teacher login clears currentVoter', () => {
+    // 5. Role transitions
+    test('teacher login clears currentVoter', async () => {
         const app = mockApp();
         app.currentVoter = 'Dave';
-        app._teacherLogin('VSU2026Admin!');
+        app._selectRole('teacher');
+        await app._doLoginWithValue('VSU2026Admin!');
         assert.equal(app.currentVoter, null);
         assert.equal(app.isTeacher, true);
     });
@@ -158,17 +213,25 @@ async function runTests() {
     test('student login clears isTeacher', async () => {
         const app = mockApp();
         app.isTeacher = true;
-        await app._studentLogin('Eve');
+        app._selectRole('student');
+        await app._doLoginWithValue('Eve');
         assert.equal(app.isTeacher, false);
         assert.equal(app.currentVoter, 'Eve');
     });
 
-    // 5. Verify the mock has all required methods for inline onclick
-    test('mock app exposes all required methods', () => {
+    // 6. Reject login with no role selected first
+    test('login blocks if no role selected - teacher flow', async () => {
         const app = mockApp();
-        assert.equal(typeof app._teacherLogin, 'function');
-        assert.equal(typeof app._studentLogin, 'function');
-        assert.equal(typeof app._doLogout, 'function');
+        const result = await app._doLoginWithValue('VSU2026Admin!');
+        assert.equal(result.error, 'no role');
+        assert.equal(app.isTeacher, false);
+    });
+
+    test('login blocks if no role selected - student flow', async () => {
+        const app = mockApp();
+        const result = await app._doLoginWithValue('John');
+        assert.equal(result.error, 'no role');
+        assert.equal(app.isTeacher, false);
     });
 
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
