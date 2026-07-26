@@ -22,7 +22,7 @@ class StorageService {
         } catch (e) {}
         try {
             const voters = await this.remote.loadVotersResult();
-            if (voters.available && voters.data.length > 0) localStorage.setItem('pbVoters', JSON.stringify(voters.data));
+            if (voters.available) this.replaceVoters(voters.data);
         } catch (e) {}
     }
 
@@ -73,6 +73,10 @@ class StorageService {
             remoteAvailable = false;
         }
         if (!remoteAvailable) {
+            // A configured Firebase classroom must not report a destructive
+            // clear as complete until Firestore has acknowledged it. Local-only
+            // fallback is reserved for explicitly disabled Firebase storage.
+            if (this.remote && this.remote.runtimeConfig && this.remote.runtimeConfig.enabled === true) return false;
             this._lss('pbEvals', JSON.stringify(evaluations));
             return true;
         }
@@ -91,16 +95,41 @@ class StorageService {
     }
 
     saveVoters(voters) {
-        this._lss('pbVoters', JSON.stringify(voters));
-        this.remote.saveVoters(voters);
-        this._votersCache = voters;
+        const roster = this.replaceVoters(voters);
+        this.remote.saveVoters(roster);
+        return roster;
     }
 
     loadVoters() {
         if (this._votersCache) return this._votersCache;
         const d = this._ls('pbVoters');
-        this._votersCache = d ? JSON.parse(d) : [];
+        let voters = [];
+        try { voters = d ? JSON.parse(d) : []; } catch (e) {}
+        this._votersCache = StorageService._rosterVoters(voters);
         return this._votersCache;
+    }
+
+    replaceVoters(voters) {
+        const roster = StorageService._rosterVoters(voters);
+        this._lss('pbVoters', JSON.stringify(roster));
+        this._votersCache = roster;
+        return roster;
+    }
+
+    static _rosterVoters(voters) {
+        if (!Array.isArray(voters)) return [];
+        const roster = [];
+        const names = new Set();
+        voters.forEach(voter => {
+            if (!voter || !EvaluationKey.isIdentity(voter.name)) return;
+            const identity = voter.name.toLowerCase();
+            if (names.has(identity)) return;
+            names.add(identity);
+            const rosterVoter = { name: voter.name };
+            if (voter.loggedIn === true) rosterVoter.loggedIn = true;
+            roster.push(rosterVoter);
+        });
+        return roster;
     }
 
     async clearAll() {
@@ -108,6 +137,7 @@ class StorageService {
         localStorage.removeItem('pbRubric');
         localStorage.removeItem('pbGroups');
         localStorage.removeItem('pbVoters');
+        this._votersCache = [];
         return true;
     }
 }

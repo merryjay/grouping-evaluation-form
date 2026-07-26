@@ -93,6 +93,35 @@ async function runTests() {
     assert.deepEqual(await emptyDocument.loadVoters(), []);
     assert.equal(Object.keys((await emptyDocument.loadEvaluationsResult()).data).length, 0);
 
+    let evaluationListener;
+    let unsubscribed = false;
+    const listenerState = vm.runInContext(`({
+        groups: [{ name: 'Group One', members: 'Alice' }],
+        evaluations: { 'g:0:Alice': { scores: {}, totalRaw: 0, totalWeighted: 0, grade: 'F', date: '7/26/2026' } }
+    })`, context);
+    const listenerService = new FirebaseService(runtimeConfig, async () => [
+        { getApps: () => [], initializeApp: config => ({ options: config }) },
+        {
+            getFirestore: () => db,
+            doc: () => stateRef,
+            onSnapshot: (ref, next) => {
+                assert.equal(ref, stateRef);
+                evaluationListener = next;
+                return () => { unsubscribed = true; };
+            }
+        }
+    ]);
+    let listenerResult = null;
+    const unsubscribe = await listenerService.subscribeEvaluations(result => { listenerResult = result; });
+    evaluationListener({
+        exists: () => true,
+        data: () => listenerState
+    });
+    assert.equal(listenerResult.available, true);
+    assert.equal(Object.keys(listenerResult.data).length, 1);
+    unsubscribe();
+    assert.equal(unsubscribed, true);
+
     const evaluationState = vm.runInContext(`({
         groups: [{ name: 'Group One', members: 'Alice\\nBob' }],
         evaluations: {

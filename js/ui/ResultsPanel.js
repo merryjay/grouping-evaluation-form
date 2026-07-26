@@ -262,6 +262,9 @@ class ResultsPanel {
         if (window.app && typeof window.app._markResultsMutation === 'function') {
             window.app._markResultsMutation();
         }
+        if (window.app && typeof window.app._syncVoterRosterFromEvaluations === 'function') {
+            window.app._syncVoterRosterFromEvaluations({ persistRemote: true });
+        }
     }
 
     _showClearError() {

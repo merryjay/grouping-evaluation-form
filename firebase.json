@@ -45,6 +45,24 @@
             "value": "no-cache, max-age=0, must-revalidate"
           }
         ]
+      },
+      {
+        "source": "/student.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/teacher.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, max-age=0, must-revalidate"
+          }
+        ]
       }
     ]
   }

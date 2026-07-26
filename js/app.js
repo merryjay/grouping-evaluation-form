@@ -176,11 +176,11 @@ class App {
             this.voterGroupIndex = this._findVoterGroupIndex(loginName);
             const existing = this.voters.find(v => v.name.toLowerCase() === loginName.toLowerCase());
             if (!existing) {
-                this.voters.push({ name: loginName, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+                this.voters.push({ name: loginName, loggedIn: true });
             } else {
                 existing.loggedIn = true;
             }
-            this.storage.saveVoters(this.voters);
+            this.voters = this.storage.saveVoters(this.voters);
             const ol = document.getElementById('loginOverlay');
             if (ol) ol.style.display = 'none';
             const lb = document.getElementById('logoutBtn');
@@ -217,6 +217,7 @@ class App {
         this._setupLogin();
         try { this._setupTabListeners(); } catch (e) { console.warn('tab listeners failed', e); }
         try { this._setupGlobalListeners(); } catch (e) { console.warn('global listeners failed', e); }
+        this._startEvaluationSync();
 
         try {
             if (this.evaluations.size() > 0) {
@@ -258,8 +259,7 @@ class App {
                 this.evaluations.fromJSON(evals.data);
             }
             if (voters.available) {
-                localStorage.setItem('pbVoters', JSON.stringify(voters.data));
-                this.voters = voters.data;
+                this.voters = this.storage.replaceVoters(voters.data);
             }
             if (groups.available && groups.data.length > 0) {
                 localStorage.setItem('pbGroups', JSON.stringify(groups.data));
@@ -272,15 +272,52 @@ class App {
     async _refreshStudentEvals() {
         try {
             const remoteEvals = await this.storage.remote.loadEvaluationsResult();
-            if (remoteEvals.available) {
-                localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
-                this.evaluations.fromJSON(remoteEvals.data);
-            }
+            App.prototype._applyRemoteEvaluations.call(this, remoteEvals);
         } catch (e) {}
         this.evaluationPanel.buildGrid();
-        if (this.tabManager) {
-            const active = this.tabManager.activeTab;
+    }
+
+    _syncVoterRosterFromEvaluations({ persistRemote = false } = {}) {
+        const source = Array.isArray(this.voters)
+            ? this.voters
+            : (this.storage && typeof this.storage.loadVoters === 'function' ? this.storage.loadVoters() : []);
+        if (!this.storage || typeof this.storage.replaceVoters !== 'function') {
+            this.voters = source;
+            return this.voters;
         }
+        // Completion remains in EvaluationCollection. Replacing the roster strips
+        // legacy hasVoted/rated* fields from app state, cache, and local storage.
+        this.voters = this.storage.replaceVoters(source);
+        if (persistRemote && this.storage.remote && typeof this.storage.remote.saveVoters === 'function') {
+            this.storage.remote.saveVoters(this.voters);
+        }
+        return this.voters;
+    }
+
+    _applyRemoteEvaluations(remoteEvals, { rebuildStudent = false, renderResults = false } = {}) {
+        if (!remoteEvals || !remoteEvals.available) return false;
+        localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
+        this.evaluations.fromJSON(remoteEvals.data);
+        App.prototype._syncVoterRosterFromEvaluations.call(this);
+        if (renderResults && this.resultsPanel) {
+            const freshEvals = new EvaluationCollection(this.groups).fromJSON(remoteEvals.data);
+            this.resultsPanel.showPasswordPrompt(freshEvals);
+        }
+        if (rebuildStudent && !this.isTeacher && this.currentVoter && this.evaluationPanel) {
+            this.evaluationPanel.buildGrid();
+        }
+        return true;
+    }
+
+    async _startEvaluationSync() {
+        if (this._evaluationUnsubscribe || !this.storage || !this.storage.remote
+            || typeof this.storage.remote.subscribeEvaluations !== 'function') return;
+        try {
+            const unsubscribe = await this.storage.remote.subscribeEvaluations(remoteEvals => {
+                App.prototype._applyRemoteEvaluations.call(this, remoteEvals, { rebuildStudent: true });
+            });
+            if (typeof unsubscribe === 'function') this._evaluationUnsubscribe = unsubscribe;
+        } catch (e) {}
     }
 
     _applyRoleVisibility() {
@@ -456,7 +493,11 @@ class App {
             this.groupPanel.buildList();
         }
         if (tabId === 'evaluate') {
-            this.evaluationPanel.buildGrid();
+            if (!this.isTeacher && this.currentVoter) {
+                this._refreshStudentEvals();
+            } else {
+                this.evaluationPanel.buildGrid();
+            }
         }
         if (tabId === 'voters') {
             this._renderVoters();
@@ -511,11 +552,7 @@ class App {
         try {
             const remoteEvals = await this.storage.remote.loadEvaluationsResult();
             if (refreshVersion !== (this._resultsVersion || 0)) return;
-            if (remoteEvals.available) {
-                localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
-                this.evaluations.fromJSON(remoteEvals.data);
-                const freshEvals = new EvaluationCollection(this.groups).fromJSON(remoteEvals.data);
-                this.resultsPanel.showPasswordPrompt(freshEvals);
+            if (App.prototype._applyRemoteEvaluations.call(this, remoteEvals, { renderResults: true })) {
                 if (this.tabManager) {
                     const active = this.tabManager.activeTab;
                     if (active === 'voters') {
@@ -545,7 +582,10 @@ class App {
         document.getElementById('exportAllBtn').addEventListener('click', () => this.resultsPanel.exportCSV());
 
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) this._refreshResults();
+            if (!document.hidden) {
+                if (!this.isTeacher && this.currentVoter) this._refreshStudentEvals();
+                else this._refreshResults();
+            }
         });
     }
 }

@@ -106,6 +106,24 @@ class FirebaseService {
     }
     async saveVoters(voters) { return this._write({ voters }); }
 
+    async subscribeEvaluations(listener) {
+        if (typeof listener !== 'function' || !await this.init() || typeof this._sdk.onSnapshot !== 'function') return null;
+        try {
+            const unsubscribe = this._sdk.onSnapshot(this._stateRef, snapshot => {
+                listener({
+                    available: true,
+                    data: FirebaseService.normalizeDocument(snapshot.exists() ? snapshot.data() : {}).evaluations
+                });
+            }, error => {
+                console.warn('Firebase evaluation listener failed; existing local evaluations remain in use.', error);
+            });
+            return typeof unsubscribe === 'function' ? unsubscribe : () => {};
+        } catch (error) {
+            console.warn('Firebase evaluation listener is unavailable.', error);
+            return null;
+        }
+    }
+
     async saveEvaluation(groupIndex, scores, totalRaw, totalWeighted, grade, voter) {
         const key = EvaluationKey.groupKey(groupIndex, voter);
         if (!key) return false;
@@ -251,14 +269,9 @@ class FirebaseService {
             const name = voter.name;
             if (!EvaluationKey.isIdentity(name) || names.has(name)) continue;
             names.add(name);
-            voters.push({
-                name,
-                hasVoted: voter.hasVoted === true,
-                votedCount: Number.isSafeInteger(voter.votedCount) && voter.votedCount >= 0 && voter.votedCount <= this.LIMITS.groups ? voter.votedCount : 0,
-                ratedGroups: this._normalizeGroupIndexes(voter.ratedGroups),
-                ratedMembers: this._normalizeStrings(voter.ratedMembers, this.LIMITS.groups * this.LIMITS.groupMembers),
-                loggedIn: voter.loggedIn === true
-            });
+            const rosterVoter = { name };
+            if (voter.loggedIn === true) rosterVoter.loggedIn = true;
+            voters.push(rosterVoter);
         }
         return voters;
     }

@@ -84,7 +84,7 @@ class EvaluationPanel {
     }
 
     _buildGroupCard(actualIndex, group, memberList, voter, isOwnGroup, labels) {
-        const hasVoted = voter && !window.app.isTeacher && this.evaluations.getGroupEval(actualIndex, voter);
+        const hasVoted = voter && !window.app.isTeacher && this.evaluations.hasGroupCompletion(actualIndex, voter);
         let html = `<div class="group-card" id="group-card-${actualIndex}">`;
         html += `<div class="eval-toggle" data-target="${actualIndex}" style="cursor:${isOwnGroup || hasVoted ? 'default' : 'pointer'};">`;
         html += `<div style="display:flex; justify-content:space-between; align-items:center;">`;
@@ -127,7 +127,7 @@ class EvaluationPanel {
 
         memberList.forEach((m, mi) => {
             const isSelf = voter && m.toLowerCase().trim() === voter.toLowerCase().trim();
-            const hasRated = voter && this.evaluations.getMemberEval(actualIndex, m, voter);
+            const hasRated = voter && this.evaluations.hasMemberCompletion(actualIndex, m, voter);
             const encName = this._escapeHtml(m);
             html += `<div class="member-rating-row" data-group="${actualIndex}" data-member-index="${mi}" style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:${isSelf ? '#f1f5f9' : (hasRated ? '#d1fae5' : '#f8fafc')}; border:1px solid ${hasRated ? '#a7f3d0' : '#e2e8f0'}; border-radius:10px; cursor:${isSelf || hasRated ? 'default' : 'pointer'}; transition:all 0.2s;">
                 <span style="font-size:13px; font-weight:600; color:#475569; flex:1;">${mi + 1}. ${encName}</span>
@@ -371,20 +371,9 @@ class EvaluationPanel {
             }
             localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
-            let voters = window.app.storage.loadVoters();
-            const vl = voter.toLowerCase();
-            let v = voters.find(x => x.name.toLowerCase() === vl);
-            if (!v) {
-                voters.push({ name: voter, hasVoted: false, votedCount: 0, ratedGroups: [], ratedMembers: [], loggedIn: false });
-                v = voters[voters.length - 1];
+            if (window.app && window.app._syncVoterRosterFromEvaluations) {
+                window.app._syncVoterRosterFromEvaluations();
             }
-            v.hasVoted = true;
-            const ratedGroups = new Set(v.ratedGroups || []);
-            ratedGroups.add(groupIndex);
-            v.ratedGroups = [...ratedGroups];
-            v.votedCount = v.ratedGroups.length;
-            window.app.storage.saveVoters(voters);
-            window.app.voters = voters;
 
             if (btn) { btn.disabled = false; btn.textContent = '✓ VOTED'; }
             this.buildGrid();
@@ -436,18 +425,9 @@ class EvaluationPanel {
             }
             localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
-            let voters = window.app.storage.loadVoters();
-            const vl = voter.toLowerCase();
-            let v = voters.find(x => x.name.toLowerCase() === vl);
-            if (!v) {
-                voters.push({ name: voter, hasVoted: false, votedCount: 0, ratedGroups: [], ratedMembers: [], loggedIn: false });
-                v = voters[voters.length - 1];
+            if (window.app && window.app._syncVoterRosterFromEvaluations) {
+                window.app._syncVoterRosterFromEvaluations();
             }
-            const ratedMembers = new Set(v.ratedMembers || []);
-            ratedMembers.add(`${groupIndex}:${memberName}`);
-            v.ratedMembers = [...ratedMembers];
-            window.app.storage.saveVoters(voters);
-            window.app.voters = voters;
 
             if (saveBtn) saveBtn.textContent = '✓ Saved';
             this.buildGrid();
@@ -467,14 +447,8 @@ class EvaluationPanel {
         this.evaluations.deleteGroup(groupIndex, voter);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
-        let voters = window.app.storage.loadVoters();
-        const v = voters.find(x => x.name.toLowerCase() === voter.toLowerCase());
-        if (v && v.ratedGroups) {
-            v.ratedGroups = v.ratedGroups.filter(gi => gi !== groupIndex);
-            v.votedCount = v.ratedGroups.length;
-            if (v.ratedGroups.length === 0) v.hasVoted = false;
-            window.app.storage.saveVoters(voters);
-            window.app.voters = voters;
+        if (window.app && window.app._syncVoterRosterFromEvaluations) {
+            window.app._syncVoterRosterFromEvaluations();
         }
 
         const body = document.getElementById(`eval-body-${groupIndex}`);

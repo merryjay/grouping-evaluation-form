@@ -49,6 +49,33 @@ class EvaluationCollection {
         return key ? this.evaluations[key] || null : null;
     }
 
+    // Completion is intentionally derived from evaluation records. Voter roster
+    // data is session metadata and must never decide whether a student can rate.
+    hasGroupCompletion(groupIndex, voter) {
+        return this.getGroupEval(groupIndex, voter) !== null;
+    }
+
+    hasMemberCompletion(groupIndex, memberName, voter) {
+        return this.getMemberEval(groupIndex, memberName, voter) !== null;
+    }
+
+    getCompletionForVoter(voter) {
+        const canonicalVoter = this._canonicalVoter(voter);
+        const groupIndexes = [];
+        const members = [];
+        if (!canonicalVoter) return { groupIndexes, members };
+
+        for (const entry of this.getAllEntries()) {
+            if (entry.voter !== canonicalVoter) continue;
+            if (entry.type === 'group') {
+                groupIndexes.push(entry.groupIndex);
+            } else {
+                members.push({ groupIndex: entry.groupIndex, memberName: entry.memberName });
+            }
+        }
+        return { groupIndexes, members };
+    }
+
     getAllByGroup(groupIndex) {
         const results = [];
         for (const key of Object.keys(this.evaluations)) {
