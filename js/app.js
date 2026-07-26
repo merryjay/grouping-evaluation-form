@@ -250,6 +250,7 @@ class App {
         if (savedEvals) this.evaluations.fromJSON(savedEvals);
 
         this._populateMembersFromEvals();
+        this._ensureDefaultMembers();
     }
 
     _populateMembersFromEvals() {
@@ -287,6 +288,61 @@ class App {
                 changed = true;
             }
         }
+        if (changed) this.storage.saveGroups(this.groups.toJSON());
+    }
+
+    _ensureDefaultMembers() {
+        if (!this.groups.get(8)) {
+            this.groups.add({ name: 'Group 9', members: '' });
+        }
+        const addMember = (groupIndex, name) => {
+            const g = this.groups.get(groupIndex);
+            if (!g) return false;
+            const members = g.members ? g.members.split('\n').map(m => m.trim()).filter(m => m) : [];
+            if (!members.includes(name)) {
+                members.push(name);
+                g.members = members.join('\n');
+                return true;
+            }
+            return false;
+        };
+
+        let changed = false;
+
+        changed |= addMember(0, 'Nathaniel Rodrigo');
+        changed |= addMember(0, 'Junna Dag-uman');
+        changed |= addMember(0, 'Merry Jay Tumulak');
+
+        changed |= addMember(1, 'Krizia Nicole Rubio');
+        changed |= addMember(1, 'Althea Tanguamos');
+        changed |= addMember(1, 'John Alrey Gementiza');
+
+        changed |= addMember(2, 'Aranas Vince');
+        changed |= addMember(2, 'Palangan Lucille Mae');
+        changed |= addMember(2, 'Tariao Justine Jean');
+
+        changed |= addMember(3, 'Kevin Jay Morales');
+        changed |= addMember(3, 'Nylvia Apao');
+        changed |= addMember(3, 'Rosalden Rabago');
+
+        changed |= addMember(4, 'James Susas');
+        changed |= addMember(4, 'Mark Antolijao');
+        changed |= addMember(4, 'Eirich Dianne Molde');
+
+        changed |= addMember(5, 'Bal Gestly Labador');
+        changed |= addMember(5, 'Elmie Soltes');
+        changed |= addMember(5, 'Steven Yoldan');
+
+        changed |= addMember(6, 'Andrew Sambulan');
+        changed |= addMember(6, 'Allan Baguio');
+        changed |= addMember(6, 'Archie Jutag');
+
+        changed |= addMember(7, 'Angel Lou Geografo');
+        changed |= addMember(7, 'Juliemar Bartolo');
+        changed |= addMember(7, 'Gabriel Salaveria');
+
+        changed |= addMember(8, 'April Gulbin');
+
         if (changed) this.storage.saveGroups(this.groups.toJSON());
     }
 
