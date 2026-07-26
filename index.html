@@ -561,21 +561,40 @@
 <div class="bg-overlay"></div>
 
 <div id="loginOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);">
-  <div id="loginPanel" style="background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+  <div id="loginRolePicker" style="background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
     <div style="font-size:40px;margin-bottom:10px;">&#128203;</div>
-    <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation Login</h2>
-    <p id="loginSubtitle" style="font-size:13px;color:#64748b;margin-bottom:20px;">Select your role and enter your credentials.</p>
-
-    <div style="display:flex;gap:8px;margin-bottom:20px;">
-      <button id="roleStudentBtn" onclick="window.app&&window.app._selectRole('student')" style="flex:1;padding:12px;border:2px solid #e2e8f0;border-radius:12px;background:white;color:#1e293b;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;">Student</button>
-      <button id="roleTeacherBtn" onclick="window.app&&window.app._selectRole('teacher')" style="flex:1;padding:12px;border:2px solid #e2e8f0;border-radius:12px;background:white;color:#1e293b;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;">Teacher</button>
+    <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:24px;">Who are you?</p>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <button id="chooseStudentBtn" onclick="var a=window.app;if(a&&a._showNameInput)a._showNameInput();else showStudentLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
+      <button id="chooseTeacherBtn" onclick="var a=window.app;if(a&&a._showTeacherPw)a._showTeacherPw();else showTeacherLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
     </div>
+  </div>
 
-    <div id="loginInputArea" style="display:none;flex-direction:column;gap:10px;margin-bottom:10px;">
-      <input type="text" id="loginInput" placeholder="" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){event.preventDefault();window.app&&window.app._doLogin()}">
+  <div id="loginNameInput" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <h2 style="margin:0 0 6px;color:#1e293b;">Student Evaluation</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name to start evaluating groups.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
+      <button id="voterLoginBtn" onclick="var a=window.app;if(a&&a._studentLogin)a._studentLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
     </div>
-    <button id="loginBtn" onclick="window.app&&window.app._doLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Login</button>
-    <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;"></p>
+    <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
+    <div style="margin-top:12px;">
+      <button id="backToRolePickerBtn" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+    </div>
+  </div>
+
+  <div id="loginTeacherPw" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+    <h2 style="margin:0 0 6px;color:#1e293b;">Teacher Access</h2>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter the teacher password to access the dashboard.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._teacherLogin)a._teacherLogin()}">
+      <button id="teacherLoginBtn" onclick="var a=window.app;if(a&&a._teacherLogin)a._teacherLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
+    </div>
+    <p id="teacherLoginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Incorrect password.</p>
+    <div style="margin-top:12px;">
+      <button id="backToRolePickerBtn2" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
+    </div>
   </div>
 </div>
 
@@ -825,6 +844,9 @@
 <script src="js/ui/EvaluationPanel.js"></script>
 <script src="js/ui/ResultsPanel.js"></script>
 <script>
+function showStudentLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', true); showElem('loginTeacherPw', false); var inp = document.getElementById('voterNameInput'); if(inp) inp.focus(); }
+function showTeacherLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', false); showElem('loginTeacherPw', true); var inp = document.getElementById('teacherPasswordInput'); if(inp) inp.focus(); }
+function showElem(id, show) { var el = document.getElementById(id); if(el) el.style.display = show ? 'block' : 'none'; }
 function logoutUser() {
     localStorage.removeItem('rubricLoggedInUser');
     localStorage.removeItem('rubricDeviceName');
@@ -841,16 +863,26 @@ function logoutUser() {
             });
             if (app.storage) app.storage.saveVoters(app.voters);
         }
-        app.evaluations.clearAll();
-        if (app._resetLogin) app._resetLogin();
     }
     var overlay = document.getElementById('loginOverlay');
+    var studentDiv = document.getElementById('studentLogin');
+    var teacherDiv = document.getElementById('teacherLogin');
     if (overlay) overlay.style.display = 'flex';
+    if (studentDiv) studentDiv.style.display = 'block';
+    if (teacherDiv) teacherDiv.style.display = 'none';
     var logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) logoutBtn.style.display = 'none';
+    var nameInput = document.getElementById('voterNameInput');
+    if (nameInput) { nameInput.value = ''; nameInput.focus(); }
+    var pwInput = document.getElementById('teacherPasswordInput');
+    if (pwInput) pwInput.value = '';
+    var loginErr = document.getElementById('loginError');
+    if (loginErr) loginErr.style.display = 'none';
+    var teacherErr = document.getElementById('teacherLoginError');
+    if (teacherErr) teacherErr.style.display = 'none';
     var tabs = document.querySelectorAll('.tab');
     tabs.forEach(function(t) { t.style.display = ''; });
-    if (app && app.tabManager) app.tabManager.switch('setup');
+    if (app) app.tabManager.switch('setup');
 }
 </script>
 <script src="js/app.js"></script>

@@ -31,63 +31,48 @@ async function run() {
         await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle', timeout: 15000 });
         await page.waitForTimeout(1000);
 
-        // 1. Login overlay visible
         const overlay = page.locator('#loginOverlay');
+
+        // 1. Login overlay visible
         if (await overlay.isVisible()) ok('Login overlay visible');
         else fail('Login overlay visible', 'not visible');
 
-        // 2. Click role buttons, then try Login without selecting role
-        await page.click('#loginBtn');
+        // 2. Teacher button -> password panel
+        await page.click('#chooseTeacherBtn');
         await page.waitForTimeout(300);
-        const errorEl = page.locator('#loginError');
-        if (await errorEl.isVisible()) {
-            const text = await errorEl.textContent();
-            if (text.includes('select a role')) ok('Shows error when no role selected');
-            else fail('Shows error when no role selected', 'wrong text: ' + text);
-        } else fail('Shows error when no role selected', 'error not visible');
+        const pwDiv = page.locator('#loginTeacherPw');
+        if (await pwDiv.isVisible()) ok('Teacher button shows password panel');
+        else fail('Teacher button shows password panel', 'not visible');
 
-        // 3. Select Student role, try Login with empty name
-        await page.click('#roleStudentBtn');
-        await page.waitForTimeout(200);
-        await page.click('#loginBtn');
+        // 3. Wrong password -> error
+        await page.fill('#teacherPasswordInput', 'wrongpw');
+        await page.click('#teacherLoginBtn');
         await page.waitForTimeout(300);
-        if (await errorEl.isVisible()) {
-            const text = await errorEl.textContent();
-            if (text.includes('enter your name')) ok('Shows error when student name empty');
-            else fail('Shows error when student name empty', 'wrong text: ' + text);
-        } else fail('Shows error when student name empty', 'error not visible');
+        const pwErr = page.locator('#teacherLoginError');
+        if (await pwErr.isVisible()) ok('Wrong password shows error');
+        else fail('Wrong password shows error', 'not visible');
 
-        // 4. Type student name, click Login
-        await page.fill('#loginInput', 'TestStudent');
-        await page.click('#loginBtn');
-        await page.waitForTimeout(1000);
-        if (!await overlay.isVisible()) ok('Student login hides overlay (click Login)');
-        else fail('Student login hides overlay', 'overlay still visible');
-
-        // 5. Logout
-        await page.click('#logoutBtn');
-        await page.waitForTimeout(300);
-        if (await overlay.isVisible()) ok('Logout returns to login overlay');
-        else fail('Logout returns', 'overlay not visible');
-
-        // 6. Select Teacher, wrong password
-        await page.click('#roleTeacherBtn');
-        await page.waitForTimeout(200);
-        await page.fill('#loginInput', 'wrongpw');
-        await page.click('#loginBtn');
-        await page.waitForTimeout(300);
-        if (await errorEl.isVisible()) {
-            const text = await errorEl.textContent();
-            if (text.includes('Incorrect password')) ok('Shows error on wrong teacher password');
-            else fail('Shows error on wrong teacher password', 'wrong text: ' + text);
-        } else fail('Shows error on wrong teacher password', 'error not visible');
-
-        // 7. Correct teacher password, press Enter key
-        await page.fill('#loginInput', 'VSU2026Admin!');
-        await page.locator('#loginInput').press('Enter');
+        // 4. Correct password via Enter key
+        await page.fill('#teacherPasswordInput', 'VSU2026Admin!');
+        await page.locator('#teacherPasswordInput').press('Enter');
         await page.waitForTimeout(500);
         if (!await overlay.isVisible()) ok('Teacher login hides overlay (Enter key)');
         else fail('Teacher login hides overlay', 'overlay still visible');
+
+        // 5. Logout -> back to overlay
+        await page.click('#logoutBtn');
+        await page.waitForTimeout(300);
+        if (await overlay.isVisible()) ok('Logout returns to overlay');
+        else fail('Logout returns to overlay', 'not visible');
+
+        // 6. Student login via click
+        await page.click('#chooseStudentBtn');
+        await page.waitForTimeout(300);
+        await page.fill('#voterNameInput', 'TestUser');
+        await page.click('#voterLoginBtn');
+        await page.waitForTimeout(1000);
+        if (!await overlay.isVisible()) ok('Student login works');
+        else fail('Student login works', 'overlay still visible');
 
     } catch (e) {
         console.log(`  ERROR: ${e.message}`);

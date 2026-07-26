@@ -24,113 +24,44 @@ class App {
         this.voterGroupIndex = null;
 
         window.app = this;
-        this._selectedRole = null;
 
         this._doLogout = () => {};
+        this._studentLogin = async () => {};
+        this._teacherLogin = () => {};
+        this._showRolePicker = () => {};
+        this._showNameInput = () => {};
+        this._showTeacherPw = () => {};
 
         const a = window.app;
-        a._resetLogin = () => {
-            this._selectedRole = null;
-            this.currentVoter = null;
-            this.isTeacher = false;
-            this.voterGroupIndex = null;
-            const ia = document.getElementById('loginInputArea');
-            if (ia) ia.style.display = 'none';
-            const inp = document.getElementById('loginInput');
-            if (inp) { inp.value = ''; inp.type = 'text'; inp.placeholder = ''; }
-            const err = document.getElementById('loginError');
-            if (err) { err.style.display = 'none'; err.textContent = ''; }
-            const sb = document.getElementById('roleStudentBtn');
-            const tb = document.getElementById('roleTeacherBtn');
-            if (sb) sb.style.background = 'white';
-            if (tb) tb.style.background = 'white';
+        a._showRolePicker = () => {
+            const rp = document.getElementById('loginRolePicker');
+            const ni = document.getElementById('loginNameInput');
+            const tp = document.getElementById('loginTeacherPw');
+            if (rp) rp.style.display = 'block';
+            if (ni) ni.style.display = 'none';
+            if (tp) tp.style.display = 'none';
         };
-        a._selectRole = (role) => {
-            this._selectedRole = role;
-            const i = document.getElementById('loginInput');
-            const ia = document.getElementById('loginInputArea');
-            const sub = document.getElementById('loginSubtitle');
+        a._showNameInput = () => {
+            const rp = document.getElementById('loginRolePicker');
+            const ni = document.getElementById('loginNameInput');
+            const tp = document.getElementById('loginTeacherPw');
+            if (rp) rp.style.display = 'none';
+            if (ni) ni.style.display = 'block';
+            if (tp) tp.style.display = 'none';
             const err = document.getElementById('loginError');
-            if (err) { err.style.display = 'none'; err.textContent = ''; }
-            if (i) i.value = '';
-            const sb = document.getElementById('roleStudentBtn');
-            const tb = document.getElementById('roleTeacherBtn');
-            if (sb) sb.style.background = role === 'student' ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white';
-            if (sb) sb.style.color = role === 'student' ? 'white' : '#1e293b';
-            if (tb) tb.style.background = role === 'teacher' ? 'linear-gradient(135deg,#1e293b,#334155)' : 'white';
-            if (tb) tb.style.color = role === 'teacher' ? 'white' : '#1e293b';
-            if (ia) ia.style.display = 'flex';
-            if (i) {
-                if (role === 'student') {
-                    i.type = 'text';
-                    i.placeholder = 'Your full name';
-                    if (sub) sub.textContent = 'Enter your name to start evaluating groups.';
-                } else {
-                    i.type = 'password';
-                    i.placeholder = 'Teacher password';
-                    if (sub) sub.textContent = 'Enter the teacher password to access the dashboard.';
-                }
-                i.focus();
-            }
+            if (err) { err.style.display = 'none'; err.textContent = 'Please enter your name.'; }
+            const inp = document.getElementById('voterNameInput');
+            if (inp) inp.focus();
         };
-        a._showError = (msg) => {
-            const err = document.getElementById('loginError');
-            if (err) { err.textContent = msg; err.style.display = 'block'; }
-        };
-        a._doLogin = async () => {
-            if (!this._selectedRole) {
-                a._showError('Please select a role (Student or Teacher).');
-                return;
-            }
-            const input = document.getElementById('loginInput');
-            const value = input ? input.value.trim() : '';
-            if (!value) {
-                if (this._selectedRole === 'student') {
-                    a._showError('Please enter your name.');
-                } else {
-                    a._showError('Please enter the teacher password.');
-                }
-                return;
-            }
-            if (this._selectedRole === 'teacher') {
-                if (value !== 'VSU2026Admin!') {
-                    a._showError('Incorrect password.');
-                    return;
-                }
-                this.currentVoter = null;
-                this.isTeacher = true;
-                localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'teacher' }));
-                const ol = document.getElementById('loginOverlay');
-                if (ol) ol.style.display = 'none';
-                const lb = document.getElementById('logoutBtn');
-                if (lb) lb.style.display = '';
-                this._applyRoleVisibility();
-                this.dashboardPanel.render();
-            } else {
-                try {
-                    const raw = await this.storage.pb.loadEvaluations();
-                    if (raw) {
-                        localStorage.setItem('pbEvals', JSON.stringify(raw));
-                        this.evaluations.fromJSON(raw);
-                    }
-                } catch (e) {}
-                this.currentVoter = value;
-                this.isTeacher = false;
-                this.voterGroupIndex = null;
-                const existing = this.voters.find(v => v.name === value);
-                if (!existing) {
-                    this.voters.push({ name: value, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
-                } else {
-                    existing.loggedIn = true;
-                }
-                this.storage.saveVoters(this.voters);
-                const ol = document.getElementById('loginOverlay');
-                if (ol) ol.style.display = 'none';
-                const lb = document.getElementById('logoutBtn');
-                if (lb) lb.style.display = '';
-                this._applyRoleVisibility();
-                this.evaluationPanel.buildGrid();
-            }
+        a._showTeacherPw = () => {
+            const rp = document.getElementById('loginRolePicker');
+            const ni = document.getElementById('loginNameInput');
+            const tp = document.getElementById('loginTeacherPw');
+            if (rp) rp.style.display = 'none';
+            if (ni) ni.style.display = 'none';
+            if (tp) tp.style.display = 'block';
+            const inp = document.getElementById('teacherPasswordInput');
+            if (inp) inp.focus();
         };
         a._doLogout = () => {
             const wasVoter = this.currentVoter;
@@ -146,9 +77,67 @@ class App {
             this.evaluations.clearAll();
             const lb = document.getElementById('logoutBtn');
             if (lb) lb.style.display = 'none';
+            const ni = document.getElementById('voterNameInput');
+            if (ni) ni.value = '';
+            const pi = document.getElementById('teacherPasswordInput');
+            if (pi) pi.value = '';
+            const le = document.getElementById('loginError');
+            if (le) le.style.display = 'none';
+            const te = document.getElementById('teacherLoginError');
+            if (te) te.style.display = 'none';
             const ol = document.getElementById('loginOverlay');
             if (ol) ol.style.display = 'flex';
-            a._resetLogin();
+            a._showRolePicker();
+        };
+        a._studentLogin = async () => {
+            const nameInput = document.getElementById('voterNameInput');
+            const name = nameInput ? nameInput.value.trim() : '';
+            if (!name) {
+                const err = document.getElementById('loginError');
+                if (err) err.style.display = 'block';
+                return;
+            }
+            try {
+                const raw = await this.storage.pb.loadEvaluations();
+                if (raw) {
+                    localStorage.setItem('pbEvals', JSON.stringify(raw));
+                    this.evaluations.fromJSON(raw);
+                }
+            } catch (e) {}
+            const err = document.getElementById('loginError');
+            if (err) err.style.display = 'none';
+            this.currentVoter = name;
+            this.isTeacher = false;
+            this.voterGroupIndex = null;
+            const existing = this.voters.find(v => v.name === name);
+            if (!existing) {
+                this.voters.push({ name, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
+            } else {
+                existing.loggedIn = true;
+            }
+            this.storage.saveVoters(this.voters);
+            const ol = document.getElementById('loginOverlay');
+            if (ol) ol.style.display = 'none';
+            const lb = document.getElementById('logoutBtn');
+            if (lb) lb.style.display = '';
+            this._applyRoleVisibility();
+            this.evaluationPanel.buildGrid();
+        };
+        a._teacherLogin = () => {
+            const pwInput = document.getElementById('teacherPasswordInput');
+            const pw = pwInput ? pwInput.value : '';
+            const err = document.getElementById('teacherLoginError');
+            if (pw !== 'VSU2026Admin!') { if (err) err.style.display = 'block'; return; }
+            if (err) err.style.display = 'none';
+            this.currentVoter = null;
+            this.isTeacher = true;
+            localStorage.setItem('rubricLoggedInUser', JSON.stringify({ type: 'teacher' }));
+            const ol = document.getElementById('loginOverlay');
+            if (ol) ol.style.display = 'none';
+            const lb = document.getElementById('logoutBtn');
+            if (lb) lb.style.display = '';
+            this._applyRoleVisibility();
+            this.dashboardPanel.render();
         };
     }
 
@@ -180,6 +169,17 @@ class App {
     _setupLogin() {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) logoutBtn.addEventListener('click', () => this._doLogout());
+        try {
+            const el = (id) => document.getElementById(id);
+            if (el('chooseStudentBtn')) el('chooseStudentBtn').addEventListener('click', () => window.app._showNameInput());
+            if (el('chooseTeacherBtn')) el('chooseTeacherBtn').addEventListener('click', () => window.app._showTeacherPw());
+            if (el('backToRolePickerBtn')) el('backToRolePickerBtn').addEventListener('click', () => window.app._showRolePicker());
+            if (el('backToRolePickerBtn2')) el('backToRolePickerBtn2').addEventListener('click', () => window.app._showRolePicker());
+            if (el('voterLoginBtn')) el('voterLoginBtn').addEventListener('click', () => window.app._studentLogin());
+            if (el('voterNameInput')) el('voterNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
+            if (el('teacherLoginBtn')) el('teacherLoginBtn').addEventListener('click', () => window.app._teacherLogin());
+            if (el('teacherPasswordInput')) el('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._teacherLogin(); } });
+        } catch (e) { console.warn('Login wiring error', e); }
     }
 
     async _freshSync() {
