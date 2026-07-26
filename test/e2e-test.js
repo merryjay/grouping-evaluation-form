@@ -22,6 +22,7 @@ async function run() {
     const server = serve();
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
+    await page.route('https://www.gstatic.com/firebasejs/**', route => route.abort());
     let passed = 0, failed = 0;
 
     function ok(n) { passed++; console.log(`  PASS: ${n}`); }

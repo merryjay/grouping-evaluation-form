@@ -1,41 +1,28 @@
 class StorageService {
     constructor() {
-        this.pb = new PocketBaseService();
+        this.remote = new FirebaseService();
         this._votersCache = null;
     }
 
     async init() {
+        await this.remote.init();
         try {
-            const rubric = await this.pb.loadRubric();
-            if (rubric) localStorage.setItem('pbRubric', JSON.stringify(rubric));
+            const rubric = await this.remote.loadRubricResult();
+            if (rubric.available && rubric.data) localStorage.setItem('pbRubric', JSON.stringify(rubric.data));
         } catch (e) {}
         try {
-            const groups = await this.pb.loadGroups();
-            if (groups.length > 0) localStorage.setItem('pbGroups', JSON.stringify(groups));
+            const groups = await this.remote.loadGroupsResult();
+            if (groups.available && groups.data.length > 0) localStorage.setItem('pbGroups', JSON.stringify(groups.data));
         } catch (e) {}
         try {
-            await this.pb._cleanInvalidEvaluations();
-            const pbEvals = await this.pb.loadEvaluations();
-            const localEvals = this._ls('pbEvals');
-            if (Object.keys(pbEvals).length > 0) {
-                localStorage.setItem('pbEvals', JSON.stringify(pbEvals));
-            } else if (localEvals) {
-                const parsed = JSON.parse(localEvals);
-                const hasValid = Object.keys(parsed).some(k => {
-                    const under = k.indexOf('_');
-                    const gi = parseInt(k.slice(0, under));
-                    return !isNaN(gi);
-                });
-                if (hasValid) this.pb._restoreEvaluations(parsed);
+            const remoteEvals = await this.remote.loadEvaluationsResult();
+            if (remoteEvals.available) {
+                localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
             }
         } catch (e) {}
         try {
-            const voters = await this.pb.loadVoters();
-            if (voters.length > 0) {
-                localStorage.setItem('pbVoters', JSON.stringify(voters));
-            } else if (this._ls('pbVoters')) {
-                this.pb.saveVoters(JSON.parse(this._ls('pbVoters')));
-            }
+            const voters = await this.remote.loadVotersResult();
+            if (voters.available && voters.data.length > 0) localStorage.setItem('pbVoters', JSON.stringify(voters.data));
         } catch (e) {}
     }
 
@@ -44,7 +31,7 @@ class StorageService {
 
     saveRubric(config) {
         this._lss('pbRubric', JSON.stringify(config));
-        this.pb.saveRubric(config);
+        this.remote.saveRubric(config);
     }
 
     loadRubric() {
@@ -54,7 +41,7 @@ class StorageService {
 
     saveGroups(groups) {
         this._lss('pbGroups', JSON.stringify(groups));
-        this.pb.saveGroups(groups);
+        this.remote.saveGroups(groups);
     }
 
     loadGroups() {
@@ -64,13 +51,7 @@ class StorageService {
 
     async saveEvaluations(evaluations) {
         this._lss('pbEvals', JSON.stringify(evaluations));
-        for (const [key, data] of Object.entries(evaluations)) {
-            const under = key.indexOf('_');
-            if (under < 0) continue;
-            const gi = parseInt(key.slice(0, under));
-            if (isNaN(gi)) continue;
-            await this.pb.saveEvaluation(gi, data.scores, data.totalRaw, data.totalWeighted, data.grade, key.slice(under + 1));
-        }
+        await this.remote.saveEvaluations(evaluations);
     }
 
     loadEvaluations() {
@@ -80,7 +61,7 @@ class StorageService {
 
     saveVoters(voters) {
         this._lss('pbVoters', JSON.stringify(voters));
-        this.pb.saveVoters(voters);
+        this.remote.saveVoters(voters);
         this._votersCache = voters;
     }
 
@@ -96,6 +77,6 @@ class StorageService {
         localStorage.removeItem('pbGroups');
         localStorage.removeItem('pbEvals');
         localStorage.removeItem('pbVoters');
-        this.pb.clearAllEvaluations();
+        this.remote.clearAllEvaluations();
     }
 }

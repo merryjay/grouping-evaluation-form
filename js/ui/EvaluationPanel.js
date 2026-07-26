@@ -48,7 +48,7 @@ class EvaluationPanel {
 
         groupsToRender.forEach((group, gi) => {
             const actualIndex = selectedGroupIndex !== null ? selectedGroupIndex : this.groups.getAll().indexOf(group);
-            const memberList = this.groups.getMemberList(actualIndex);
+            const memberList = this._getSortedMembers(actualIndex);
             const voter = window.app && window.app.currentVoter;
             const isOwnGroup = window.app && !window.app.isTeacher && window.app.voterGroupIndex === actualIndex;
 
@@ -125,16 +125,16 @@ class EvaluationPanel {
         html += `<h4 style="font-size:11px; text-transform:uppercase; color:#94a3b8; margin-bottom:10px; font-weight:600; letter-spacing:1px;">Select a member to rate</h4>`;
         html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
 
-        memberList.sort((a, b) => a.localeCompare(b)).forEach((m, mi) => {
+        memberList.forEach((m, mi) => {
             const isSelf = voter && m.toLowerCase().trim() === voter.toLowerCase().trim();
             const hasRated = voter && this.evaluations.getMemberEval(actualIndex, m, voter);
             const encName = this._escapeHtml(m);
-            html += `<div class="member-rating-row" data-group="${actualIndex}" data-member="${encName}" style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:${isSelf ? '#f1f5f9' : (hasRated ? '#d1fae5' : '#f8fafc')}; border:1px solid ${hasRated ? '#a7f3d0' : '#e2e8f0'}; border-radius:10px; cursor:${isSelf || hasRated ? 'default' : 'pointer'}; transition:all 0.2s;">
+            html += `<div class="member-rating-row" data-group="${actualIndex}" data-member-index="${mi}" style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:${isSelf ? '#f1f5f9' : (hasRated ? '#d1fae5' : '#f8fafc')}; border:1px solid ${hasRated ? '#a7f3d0' : '#e2e8f0'}; border-radius:10px; cursor:${isSelf || hasRated ? 'default' : 'pointer'}; transition:all 0.2s;">
                 <span style="font-size:13px; font-weight:600; color:#475569; flex:1;">${mi + 1}. ${encName}</span>
                 ${isSelf ? '<span style="font-size:10px;color:#94a3b8;">You</span>' : ''}
                 ${hasRated ? '<span style="font-size:10px;color:#059669;font-weight:600;">✓ Rated</span>' : '<span style="font-size:10px;color:#667eea;font-weight:600;">Rate</span>'}
             </div>`;
-            html += `<div class="member-eval-form" id="member-eval-${actualIndex}-${mi}" style="display:none; margin-top:4px; padding:10px; background:white; border:1px solid #e2e8f0; border-radius:10px;" data-group="${actualIndex}" data-member="${m}"></div>`;
+            html += `<div class="member-eval-form" id="member-eval-${actualIndex}-${mi}" style="display:none; margin-top:4px; padding:10px; background:white; border:1px solid #e2e8f0; border-radius:10px;" data-group="${actualIndex}" data-member-index="${mi}"></div>`;
         });
 
         html += `</div></div>`;
@@ -177,7 +177,7 @@ class EvaluationPanel {
             const currentScore = currentScores[c.name] || 0;
             html += `<div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:10px;">`;
             html += `<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">${this._escapeHtml(c.name)}</div>`;
-            html += `<div class="star-rating" data-group="${groupIndex}" data-member="${this._escapeHtml(memberName)}" data-criterion="${ci}">`;
+            html += `<div class="star-rating" data-group="${groupIndex}" data-criterion="${ci}">`;
             for (let s = 1; s <= this.rubric.maxScore; s++) {
                 const selectedClass = s === currentScore ? 'selected' : '';
                 html += `<button class="star-btn ${selectedClass}" data-score="${s}">${s}</button>`;
@@ -187,7 +187,7 @@ class EvaluationPanel {
         });
         html += `</div>`;
         html += `<div style="display:flex; gap:8px; margin-top:12px;">`;
-        html += `<button class="save-member-btn" data-group="${groupIndex}" data-member="${this._escapeHtml(memberName)}" style="flex:1; padding:10px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">Submit Rating</button>`;
+        html += `<button class="save-member-btn" data-group="${groupIndex}" style="flex:1; padding:10px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">Submit Rating</button>`;
         html += `</div></div>`;
         return html;
     }
@@ -239,10 +239,12 @@ class EvaluationPanel {
         this.el.grid.querySelectorAll('.member-rating-row').forEach(row => {
             row.addEventListener('click', (e) => {
                 const voter = window.app && window.app.currentVoter;
-                const memberName = row.dataset.member;
-                if (voter && memberName.toLowerCase().trim() === voter.toLowerCase().trim()) return;
                 const groupIndex = parseInt(row.dataset.group);
-                this._toggleMemberForm(groupIndex, memberName);
+                const memberIndex = parseInt(row.dataset.memberIndex);
+                const memberName = this._getSortedMembers(groupIndex)[memberIndex];
+                if (memberName === undefined) return;
+                if (voter && memberName.toLowerCase().trim() === voter.toLowerCase().trim()) return;
+                this._toggleMemberForm(groupIndex, memberIndex);
             });
         });
 
@@ -259,8 +261,10 @@ class EvaluationPanel {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const groupIndex = parseInt(btn.dataset.group);
-                const memberName = btn.dataset.member;
-                this._saveMemberEvaluation(groupIndex, memberName);
+                const form = btn.closest('.member-eval-form');
+                const memberIndex = form ? parseInt(form.dataset.memberIndex) : -1;
+                const memberName = this._getSortedMembers(groupIndex)[memberIndex];
+                if (memberName !== undefined) this._saveMemberEvaluation(groupIndex, memberName, form);
             });
         });
 
@@ -290,15 +294,14 @@ class EvaluationPanel {
         }
     }
 
-    _toggleMemberForm(groupIndex, memberName) {
+    _toggleMemberForm(groupIndex, memberIndex) {
         const voter = window.app && window.app.currentVoter;
         const labels = this.rubric.getScoreLabels();
 
-        const memberList = this.groups.getMemberList(groupIndex);
-        const mi = memberList.findIndex(m => m === memberName);
-        if (mi === -1) return;
+        const memberName = this._getSortedMembers(groupIndex)[memberIndex];
+        if (memberName === undefined) return;
 
-        const formId = `member-eval-${groupIndex}-${mi}`;
+        const formId = `member-eval-${groupIndex}-${memberIndex}`;
         const form = document.getElementById(formId);
         if (!form) return;
 
@@ -325,7 +328,7 @@ class EvaluationPanel {
             if (saveBtn) {
                 saveBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this._saveMemberEvaluation(groupIndex, memberName);
+                    this._saveMemberEvaluation(groupIndex, memberName, form);
                 });
             }
         }
@@ -347,7 +350,7 @@ class EvaluationPanel {
             }
             const voter = this._getVoter();
             if (voter === 'unknown') { if (btn) { btn.disabled = false; btn.textContent = 'Submit Vote'; } return; }
-            const scores = {};
+            const scores = Object.create(null);
             this.rubric.criteria.forEach((c, ci) => {
                 const container = this.el.grid.querySelector(`.star-rating[data-group="${groupIndex}"][data-criterion="${ci}"]`);
                 const selected = container ? container.querySelector('.star-btn.selected') : null;
@@ -356,9 +359,16 @@ class EvaluationPanel {
 
             const result = this.scoring.calculate(scores);
 
-            await this.storage.pb.saveEvaluation(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
-
-            this.evaluations.saveGroup(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            const remoteSaved = await this.storage.remote.saveEvaluation(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            if (!remoteSaved) {
+                if (btn) { btn.disabled = false; btn.textContent = 'Submit Vote'; }
+                return;
+            }
+            const localSaved = this.evaluations.saveGroup(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            if (!localSaved) {
+                if (btn) { btn.disabled = false; btn.textContent = 'Submit Vote'; }
+                return;
+            }
             localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
             let voters = window.app.storage.loadVoters();
@@ -385,7 +395,7 @@ class EvaluationPanel {
         }
     }
 
-    async _saveMemberEvaluation(groupIndex, memberName) {
+    async _saveMemberEvaluation(groupIndex, memberName, form = null) {
         const voter = this._getVoter();
         if (voter === 'unknown') return;
 
@@ -395,12 +405,15 @@ class EvaluationPanel {
             return;
         }
 
-        const scores = {};
-        const form = this.el.grid.querySelector(`.member-eval-form[data-group="${groupIndex}"][data-member="${memberName}"]`);
+        const scores = Object.create(null);
+        if (!form) {
+            const memberIndex = this._getSortedMembers(groupIndex).findIndex(member => member === memberName);
+            form = this.el.grid.querySelector(`.member-eval-form[data-group="${groupIndex}"][data-member-index="${memberIndex}"]`);
+        }
         if (!form) return;
 
         this.rubric.criteria.forEach((c, ci) => {
-            const container = form.querySelector(`.star-rating[data-group="${groupIndex}"][data-member="${memberName}"][data-criterion="${ci}"]`);
+            const container = form.querySelector(`.star-rating[data-group="${groupIndex}"][data-criterion="${ci}"]`);
             const selected = container ? container.querySelector('.star-btn.selected') : null;
             scores[c.name] = selected ? parseInt(selected.dataset.score) : 0;
         });
@@ -411,9 +424,16 @@ class EvaluationPanel {
         try {
             const result = this.scoring.calculate(scores);
 
-            await this.storage.pb.saveMemberEvaluation(groupIndex, memberName, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
-
-            this.evaluations.saveMember(groupIndex, memberName, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            const remoteSaved = await this.storage.remote.saveMemberEvaluation(groupIndex, memberName, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            if (!remoteSaved) {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Submit Rating'; }
+                return;
+            }
+            const localSaved = this.evaluations.saveMember(groupIndex, memberName, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            if (!localSaved) {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Submit Rating'; }
+                return;
+            }
             localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
             let voters = window.app.storage.loadVoters();
@@ -443,7 +463,7 @@ class EvaluationPanel {
         const group = this.groups.get(groupIndex);
         if (!confirm(`Clear your ratings for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
 
-        await this.storage.pb.deleteEvaluation(groupIndex, voter);
+        await this.storage.remote.deleteEvaluation(groupIndex, voter);
         this.evaluations.deleteGroup(groupIndex, voter);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
@@ -494,15 +514,17 @@ class EvaluationPanel {
     async _enableReVote(groupIndex) {
         const voter = this._getVoter();
         if (voter === 'unknown') return;
-        await this.storage.pb.deleteEvaluation(groupIndex, voter);
+        await this.storage.remote.deleteEvaluation(groupIndex, voter);
         this.evaluations.deleteGroup(groupIndex, voter);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
         this.buildGrid();
     }
 
     _escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return SafeHtml.escapeText(str);
+    }
+
+    _getSortedMembers(groupIndex) {
+        return this.groups.getMemberList(groupIndex).sort((a, b) => a.localeCompare(b));
     }
 }

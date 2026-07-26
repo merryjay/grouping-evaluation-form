@@ -39,6 +39,7 @@ class ResultsPanel {
     }
 
     _renderGroupResults(evals, toggleHtml) {
+        const safe = SafeHtml.escapeText;
         const aggregated = evals.getAggregatedByGroup();
         const allEntries = evals.getAllEntries();
 
@@ -61,16 +62,16 @@ class ResultsPanel {
             const groupName = group ? group.name : `Group ${r.groupIndex + 1}`;
             html += `<tr class="${rankClass}">
                 <td>${i + 1}</td>
-                <td><strong>${groupName}</strong></td>
-                <td>${r.totalRaw}</td>
-                <td>${r.totalWeighted}%</td>
-                <td>${r.scoreCount}</td>
+                <td><strong>${safe(groupName)}</strong></td>
+                <td>${safe(r.totalRaw)}</td>
+                <td>${safe(r.totalWeighted)}%</td>
+                <td>${safe(r.scoreCount)}</td>
                 <td>
-                    <button class="btn btn-sm toggle-stats-btn" data-group="${r.groupIndex}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
-                    <button class="btn btn-danger delete-eval-btn" data-group="${r.groupIndex}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
+                    <button class="btn btn-sm toggle-stats-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
+                    <button class="btn btn-danger delete-eval-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
                 </td>
             </tr>`;
-            html += `<tr id="stats-row-${r.groupIndex}" style="display:none;"><td colspan="6" style="padding:12px;background:#f8fafc;">
+            html += `<tr id="stats-row-${i}" style="display:none;"><td colspan="6" style="padding:12px;background:#f8fafc;">
                 <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px;">Average Scores per Criterion</div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;">`;
             const rubric = window.app ? window.app.rubric : null;
@@ -78,8 +79,8 @@ class ResultsPanel {
                 const critConfig = rubric ? rubric.criteria.find(c => c.name === crit) : null;
                 const weight = critConfig ? critConfig.weight : '';
                 html += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
-                    <div style="font-size:11px;color:#64748b;">${crit}${weight ? ` (${weight}%)` : ''}</div>
-                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${avg}</div>
+                    <div style="font-size:11px;color:#64748b;">${safe(crit)}${weight ? ` (${safe(weight)}%)` : ''}</div>
+                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${safe(avg)}</div>
                 </div>`;
             }
             html += `</div></td></tr>`;
@@ -89,8 +90,8 @@ class ResultsPanel {
 
         this.el.resultsContent.querySelectorAll('.toggle-stats-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const gi = btn.dataset.group;
-                const row = document.getElementById(`stats-row-${gi}`);
+                const resultIndex = parseInt(btn.dataset.resultIndex);
+                const row = document.getElementById(`stats-row-${resultIndex}`);
                 if (row) {
                     const isVisible = row.style.display !== 'none';
                     row.style.display = isVisible ? 'none' : 'table-row';
@@ -100,13 +101,17 @@ class ResultsPanel {
         });
 
         this.el.resultsContent.querySelectorAll('.delete-eval-btn').forEach(btn => {
-            btn.addEventListener('click', () => this._deleteEvaluation(parseInt(btn.dataset.group)));
+            btn.addEventListener('click', () => {
+                const result = aggregated[parseInt(btn.dataset.resultIndex)];
+                if (result) this._deleteEvaluation(result.groupIndex);
+            });
         });
 
         this._renderStats(aggregated, allEntries);
     }
 
     _renderMemberResults(evals, toggleHtml) {
+        const safe = SafeHtml.escapeText;
         const allMembers = evals.getAggregatedByMember();
 
         if (allMembers.length === 0) {
@@ -129,17 +134,17 @@ class ResultsPanel {
             const grade = window.app && window.app.scoring ? window.app.scoring.getGrade(r.totalWeighted) : '';
             html += `<tr class="${rankClass}">
                 <td>${i + 1}</td>
-                <td><strong>${r.memberName}</strong></td>
-                <td>${groupName}</td>
-                <td>${r.totalWeighted}%</td>
-                <td><span class="grade-badge">${grade}</span></td>
-                <td>${r.scoreCount}</td>
+                <td><strong>${safe(r.memberName)}</strong></td>
+                <td>${safe(groupName)}</td>
+                <td>${safe(r.totalWeighted)}%</td>
+                <td><span class="grade-badge">${safe(grade)}</span></td>
+                <td>${safe(r.scoreCount)}</td>
                 <td>
-                    <button class="btn btn-sm toggle-member-stats-btn" data-member="${r.memberName}" data-group="${r.groupIndex}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
-                    <button class="btn btn-danger delete-member-btn" data-member="${r.memberName}" data-group="${r.groupIndex}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
+                    <button class="btn btn-sm toggle-member-stats-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
+                    <button class="btn btn-danger delete-member-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
                 </td>
             </tr>`;
-            html += `<tr id="member-stats-row-${r.groupIndex}-${r.memberName}" style="display:none;"><td colspan="7" style="padding:12px;background:#f8fafc;">
+            html += `<tr id="member-stats-row-${i}" style="display:none;"><td colspan="7" style="padding:12px;background:#f8fafc;">
                 <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px;">Average Scores per Criterion</div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;">`;
             const rubric = window.app ? window.app.rubric : null;
@@ -147,8 +152,8 @@ class ResultsPanel {
                 const critConfig = rubric ? rubric.criteria.find(c => c.name === crit) : null;
                 const weight = critConfig ? critConfig.weight : '';
                 html += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
-                    <div style="font-size:11px;color:#64748b;">${crit}${weight ? ` (${weight}%)` : ''}</div>
-                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${avg}</div>
+                    <div style="font-size:11px;color:#64748b;">${safe(crit)}${weight ? ` (${safe(weight)}%)` : ''}</div>
+                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${safe(avg)}</div>
                 </div>`;
             }
             html += `</div></td></tr>`;
@@ -158,9 +163,8 @@ class ResultsPanel {
 
         this.el.resultsContent.querySelectorAll('.toggle-member-stats-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const gi = btn.dataset.group;
-                const mn = btn.dataset.member;
-                const row = document.getElementById(`member-stats-row-${gi}-${mn}`);
+                const resultIndex = parseInt(btn.dataset.resultIndex);
+                const row = document.getElementById(`member-stats-row-${resultIndex}`);
                 if (row) {
                     const isVisible = row.style.display !== 'none';
                     row.style.display = isVisible ? 'none' : 'table-row';
@@ -170,7 +174,10 @@ class ResultsPanel {
         });
 
         this.el.resultsContent.querySelectorAll('.delete-member-btn').forEach(btn => {
-            btn.addEventListener('click', () => this._deleteMemberEvaluation(parseInt(btn.dataset.group), btn.dataset.member));
+            btn.addEventListener('click', () => {
+                const member = allMembers[parseInt(btn.dataset.resultIndex)];
+                if (member) this._deleteMemberEvaluation(member.groupIndex, member.memberName);
+            });
         });
 
         this._renderMemberStats(allMembers);
@@ -215,7 +222,7 @@ class ResultsPanel {
         if (!confirm(`Clear ALL group votes for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
         this.evaluations.deleteGroup(groupIndex);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
-        await this.storage.pb.deleteEvaluation(groupIndex);
+        await this.storage.remote.deleteEvaluation(groupIndex);
         this.render();
     }
 
@@ -224,7 +231,7 @@ class ResultsPanel {
         if (!confirm(`Clear ALL votes for ${memberName} in ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
         this.evaluations.deleteMember(groupIndex, memberName);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
-        await this.storage.pb.deleteMemberEvaluation(groupIndex, memberName);
+        await this.storage.remote.deleteMemberEvaluation(groupIndex, memberName);
         this.render();
     }
 

@@ -18,10 +18,24 @@ class RubricConfig {
     }
 
     fromJSON(data) {
-        if (data.activityName) this.activityName = data.activityName;
-        if (data.maxScore) this.maxScore = data.maxScore;
-        if (data.criteria && data.criteria.length >= this.criteria.length) {
-            this.criteria = data.criteria.map(c => ({ ...c }));
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return this;
+        if (typeof data.activityName === 'string' && data.activityName.length > 0 && data.activityName.length <= 160
+            && data.activityName === data.activityName.trim() && !/[\u0000-\u001F\u007F]/.test(data.activityName)) {
+            this.activityName = data.activityName;
+        }
+        if ([3, 4, 5].includes(data.maxScore)) this.maxScore = data.maxScore;
+        if (Array.isArray(data.criteria) && data.criteria.length > 0 && data.criteria.length <= 30) {
+            const criteria = data.criteria.map(c => {
+                if (!c || typeof c !== 'object' || Array.isArray(c)
+                    || typeof c.name !== 'string' || c.name.length === 0 || c.name.length > 160
+                    || c.name !== c.name.trim() || /[\u0000-\u001F\u007F]/.test(c.name)
+                    || ['__proto__', 'constructor', 'prototype'].includes(c.name)
+                    || !Number.isFinite(c.weight) || c.weight < 0 || c.weight > 100) return null;
+                return { name: c.name, weight: c.weight };
+            });
+            if (criteria.every(Boolean)) {
+                this.criteria = criteria;
+            }
         }
         return this;
     }

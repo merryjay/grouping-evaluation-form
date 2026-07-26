@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Preserved legacy StudyBuddy exception for login/signup username lookup.
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Chat sessions - only owner can access
+    match /users/{userId}/sessions/{sessionId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Chat messages - only owner can access
+    match /users/{userId}/sessions/{sessionId}/messages/{messageId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Intentional public access for this app only; see FirebaseService state path.
+    match /groupingEvaluationForms/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

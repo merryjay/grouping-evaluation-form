@@ -59,7 +59,7 @@ class SetupPanel {
             </div>
             <div class="form-group">
                 <label>Weight (%)</label>
-                <input type="number" class="criteria-weight" value="${weight}" min="0" max="100">
+                <input type="number" class="criteria-weight" value="${this._escapeHtml(weight)}" min="0" max="100">
             </div>
             <button class="remove-criteria" title="Remove">&times;</button>
         `;
@@ -67,9 +67,7 @@ class SetupPanel {
     }
 
     _escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return SafeHtml.escapeText(str);
     }
 
     addCriteria() {
@@ -120,7 +118,7 @@ class SetupPanel {
                 const desc = this.rubric.getDescriptor(c.name, s);
                 html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
             }
-            html += `<td>${c.weight}%</td></tr>`;
+            html += `<td>${this._escapeHtml(c.weight)}%</td></tr>`;
         });
         html += `</table></div>`;
         this.el.rubricPreview.innerHTML = html;

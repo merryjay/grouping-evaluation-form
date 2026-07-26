@@ -5,7 +5,7 @@ class App {
         this.auth = new AuthService('VSU2026');
         this.rubric = new RubricConfig();
         this.groups = new GroupCollection();
-        this.evaluations = new EvaluationCollection();
+        this.evaluations = new EvaluationCollection(this.groups);
         this.tabManager = new TabManager();
         this.scoring = new ScoringService(this.rubric);
         this.evaluationPanel = new EvaluationPanel(this.rubric, this.groups, this.evaluations, this.scoring, this.storage);
@@ -117,7 +117,8 @@ class App {
                     if (err) { err.textContent = 'Please enter your name.'; err.style.display = 'block'; }
                     return;
                 }
-                if (!this._isNameInMemberList(name)) {
+                const membership = this._resolveStudentMembership(name);
+                if (!membership) {
                     if (err) {
                         err.textContent = 'Registration failed. Your name is not listed as an official member. Please contact the administrator.';
                         err.style.display = 'block';
@@ -125,9 +126,9 @@ class App {
                     return;
                 }
                 if (err) err.style.display = 'none';
-                this._studentLoginName = name;
+                this._studentLoginName = membership.name;
                 if (pwArea) pwArea.style.display = 'flex';
-                if (this._hasStudentPassword(name)) {
+                if (this._hasStudentPassword(membership.name)) {
                     if (confirmInput) confirmInput.style.display = 'none';
                     if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Enter your password'; pwInput.focus(); }
                     if (btn) btn.textContent = 'Log In';
@@ -163,10 +164,10 @@ class App {
             this._studentLoginName = null;
 
             try {
-                const raw = await this.storage.pb.loadEvaluations();
-                if (raw) {
-                    localStorage.setItem('pbEvals', JSON.stringify(raw));
-                    this.evaluations.fromJSON(raw);
+                const remoteEvals = await this.storage.remote.loadEvaluationsResult();
+                if (remoteEvals.available) {
+                    localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
+                    this.evaluations.fromJSON(remoteEvals.data);
                 }
             } catch (e) {}
             this.currentVoter = loginName;
@@ -208,7 +209,6 @@ class App {
         try {
             await this.storage.init();
         } catch (e) { console.warn('storage init failed', e); }
-        localStorage.removeItem('pbRubric');
         try { this._loadData(); } catch (e) { console.warn('loadData failed', e); }
         try { this.voters = this.storage.loadVoters(); } catch (e) { console.warn('loadVoters failed', e); }
         try { this.setupPanel.loadRubricIntoUI(); } catch (e) { console.warn('loadRubricIntoUI failed', e); }
@@ -248,21 +248,21 @@ class App {
     async _freshSync() {
         try {
             const [evals, voters, groups] = await Promise.all([
-                this.storage.pb.loadEvaluations(),
-                this.storage.pb.loadVoters(),
-                this.storage.pb.loadGroups()
+                this.storage.remote.loadEvaluationsResult(),
+                this.storage.remote.loadVotersResult(),
+                this.storage.remote.loadGroupsResult()
             ]);
-            if (evals) {
-                localStorage.setItem('pbEvals', JSON.stringify(evals));
-                this.evaluations.fromJSON(evals);
+            if (evals.available) {
+                localStorage.setItem('pbEvals', JSON.stringify(evals.data));
+                this.evaluations.fromJSON(evals.data);
             }
-            if (voters) {
-                localStorage.setItem('pbVoters', JSON.stringify(voters));
-                this.voters = voters;
+            if (voters.available) {
+                localStorage.setItem('pbVoters', JSON.stringify(voters.data));
+                this.voters = voters.data;
             }
-            if (groups && groups.length > 0) {
-                localStorage.setItem('pbGroups', JSON.stringify(groups));
-                this.groups.fromJSON(groups);
+            if (groups.available && groups.data.length > 0) {
+                localStorage.setItem('pbGroups', JSON.stringify(groups.data));
+                this.groups.fromJSON(groups.data);
                 this.groupPanel.buildList();
             }
         } catch (e) {}
@@ -270,10 +270,10 @@ class App {
 
     async _refreshStudentEvals() {
         try {
-            const raw = await this.storage.pb.loadEvaluations();
-            if (raw) {
-                localStorage.setItem('pbEvals', JSON.stringify(raw));
-                this.evaluations.fromJSON(raw);
+            const remoteEvals = await this.storage.remote.loadEvaluationsResult();
+            if (remoteEvals.available) {
+                localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
+                this.evaluations.fromJSON(remoteEvals.data);
             }
         } catch (e) {}
         this.evaluationPanel.buildGrid();
@@ -312,46 +312,7 @@ class App {
         const savedEvals = this.storage.loadEvaluations();
         if (savedEvals) this.evaluations.fromJSON(savedEvals);
 
-        this._populateMembersFromEvals();
         this._ensureDefaultMembers();
-    }
-
-    _populateMembersFromEvals() {
-        const entries = this.evaluations.getAllEntries();
-        if (entries.length === 0) return;
-
-        const maxGroupIdx = Math.max(...entries.map(e => e.groupIndex));
-        for (let i = 0; i <= maxGroupIdx; i++) {
-            if (!this.groups.get(i)) {
-                this.groups.add({ name: `Group ${i + 1}`, members: '' });
-            }
-        }
-
-        const membersByGroup = {};
-        for (const e of entries) {
-            if (!membersByGroup[e.groupIndex]) membersByGroup[e.groupIndex] = new Set();
-            membersByGroup[e.groupIndex].add(e.voter);
-        }
-        let changed = false;
-        for (const [gi, voters] of Object.entries(membersByGroup)) {
-            const idx = parseInt(gi);
-            const g = this.groups.get(idx);
-            if (!g) continue;
-            const existing = this.groups.getMemberList(idx);
-            const existingSet = new Set(existing);
-            let added = false;
-            for (const v of voters) {
-                if (!existingSet.has(v)) {
-                    existing.push(v);
-                    added = true;
-                }
-            }
-            if (added) {
-                g.members = existing.join('\n');
-                changed = true;
-            }
-        }
-        if (changed) this.storage.saveGroups(this.groups.toJSON());
     }
 
     _ensureDefaultMembers() {
@@ -412,45 +373,60 @@ class App {
     }
 
     _isNameInMemberList(name) {
-        const nameLower = name.toLowerCase().trim();
+        return !!this._resolveStudentMembership(name);
+    }
+
+    _resolveStudentMembership(name) {
+        if (!EvaluationKey.isIdentity(name)) return null;
+        const nameLower = name.toLowerCase();
+        const matches = [];
         for (let i = 0; i < this.groups.size(); i++) {
             const members = this.groups.getMemberList(i);
-            if (members.some(m => m.toLowerCase().trim() === nameLower)) return true;
+            for (const member of members) {
+                if (member.toLowerCase() === nameLower) matches.push({ name: member, groupIndex: i });
+            }
         }
-        return false;
+        return matches.length === 1 ? matches[0] : null;
     }
 
     _getStudentAccounts() {
-        try { return JSON.parse(localStorage.getItem('studentAccounts') || '{}'); } catch { return {}; }
+        let stored;
+        try { stored = JSON.parse(localStorage.getItem('studentAccounts') || '[]'); } catch { stored = []; }
+        const entries = Array.isArray(stored)
+            ? stored
+            : (stored && typeof stored === 'object' ? Object.entries(stored) : []);
+        const accounts = new Map();
+        entries.forEach(entry => {
+            if (!Array.isArray(entry) || entry.length !== 2) return;
+            const [name, password] = entry;
+            if (EvaluationKey.isIdentity(name) && typeof password === 'string') accounts.set(name, password);
+        });
+        return accounts;
     }
 
     _saveStudentAccounts(accounts) {
-        localStorage.setItem('studentAccounts', JSON.stringify(accounts));
+        localStorage.setItem('studentAccounts', JSON.stringify([...accounts.entries()]));
     }
 
     _hasStudentPassword(name) {
         const accounts = this._getStudentAccounts();
-        return !!accounts[name.toLowerCase().trim()];
+        return accounts.has(name.toLowerCase().trim());
     }
 
     _saveStudentPassword(name, password) {
         const accounts = this._getStudentAccounts();
-        accounts[name.toLowerCase().trim()] = password;
+        accounts.set(name.toLowerCase().trim(), password);
         this._saveStudentAccounts(accounts);
     }
 
     _checkStudentPassword(name, password) {
         const accounts = this._getStudentAccounts();
-        return accounts[name.toLowerCase().trim()] === password;
+        return accounts.get(name.toLowerCase().trim()) === password;
     }
 
     _findVoterGroupIndex(name) {
-        const nameLower = name.toLowerCase().trim();
-        for (let i = 0; i < this.groups.size(); i++) {
-            const members = this.groups.getMemberList(i);
-            if (members.some(m => m.toLowerCase().trim() === nameLower)) return i;
-        }
-        return null;
+        const membership = this._resolveStudentMembership(name);
+        return membership ? membership.groupIndex : null;
     }
 
     _setupTabListeners() {
@@ -494,17 +470,18 @@ class App {
     _renderVoters() {
         const container = document.getElementById('votersList');
         const allEntries = this.evaluations.getAllEntries();
-        const votersMap = {};
+        const votersMap = new Map();
         allEntries.forEach(e => {
-            if (!votersMap[e.voter]) votersMap[e.voter] = { groupCount: 0, memberCount: 0, groups: [] };
-            votersMap[e.voter].groups.push(e.groupIndex);
+            if (!votersMap.has(e.voter)) votersMap.set(e.voter, { groupCount: 0, memberCount: 0, groups: [] });
+            const voter = votersMap.get(e.voter);
+            voter.groups.push(e.groupIndex);
             if (e.type === 'member') {
-                votersMap[e.voter].memberCount++;
+                voter.memberCount++;
             } else {
-                votersMap[e.voter].groupCount++;
+                voter.groupCount++;
             }
         });
-        const allNames = Object.keys(votersMap).sort();
+        const allNames = [...votersMap.keys()].sort();
         if (allNames.length === 0) {
             container.innerHTML = '<div class="empty-state"><p>No votes recorded yet.</p></div>';
             return;
@@ -512,13 +489,13 @@ class App {
         const totalGroups = this.groups.size();
         let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Groups Rated</th><th>Members Rated</th><th>Status</th></tr>';
         allNames.forEach((name, i) => {
-            const v = votersMap[name];
+            const v = votersMap.get(name);
             const totalVotes = v.groupCount + v.memberCount;
             const statusClass = totalVotes > 0 ? 'grade-A' : 'grade-D';
             const statusText = totalVotes > 0 ? 'Voted' : 'Not yet';
             html += `<tr>
                 <td>${i + 1}</td>
-                <td><strong>${name}</strong></td>
+                <td><strong>${SafeHtml.escapeText(name)}</strong></td>
                 <td>${v.groupCount} / ${totalGroups}</td>
                 <td>${v.memberCount}</td>
                 <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
@@ -530,15 +507,15 @@ class App {
 
     async _refreshResults() {
         try {
-            const raw = await this.storage.pb.loadEvaluations();
-            if (raw) {
-                localStorage.setItem('pbEvals', JSON.stringify(raw));
-                const freshEvals = Object.keys(raw).length > 0 ? new EvaluationCollection().fromJSON(raw) : null;
+            const remoteEvals = await this.storage.remote.loadEvaluationsResult();
+            if (remoteEvals.available) {
+                localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
+                this.evaluations.fromJSON(remoteEvals.data);
+                const freshEvals = new EvaluationCollection(this.groups).fromJSON(remoteEvals.data);
                 this.resultsPanel.showPasswordPrompt(freshEvals);
                 if (this.tabManager) {
                     const active = this.tabManager.activeTab;
                     if (active === 'voters') {
-                        this.evaluations.fromJSON(raw);
                         this._renderVoters();
                     }
                     if (active === 'dashboard') {

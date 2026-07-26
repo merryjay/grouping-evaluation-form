@@ -15,14 +15,21 @@ class GroupPanel {
 
         this.el.container.addEventListener('click', (e) => {
             const removeMemberBtn = e.target.closest('.remove-member-btn');
-            if (removeMemberBtn) return;
+            if (removeMemberBtn) {
+                const groupIndex = parseInt(removeMemberBtn.dataset.group);
+                const memberIndex = parseInt(removeMemberBtn.dataset.memberIndex);
+                const member = this._getSortedMembers(groupIndex)[memberIndex];
+                if (member !== undefined) this._removeMember(groupIndex, member);
+                return;
+            }
 
             const editMemberBtn = e.target.closest('.edit-member-btn');
             if (editMemberBtn) {
                 e.stopPropagation();
                 const groupIndex = parseInt(editMemberBtn.getAttribute('data-group'));
-                const oldName = editMemberBtn.getAttribute('data-member');
-                this._editMemberName(groupIndex, oldName);
+                const memberIndex = parseInt(editMemberBtn.dataset.memberIndex);
+                const oldName = this._getSortedMembers(groupIndex)[memberIndex];
+                if (oldName !== undefined) this._editMemberName(groupIndex, oldName);
                 return;
             }
             const editGroupBtn = e.target.closest('.edit-group-btn');
@@ -68,7 +75,7 @@ class GroupPanel {
             this.el.addBtn.style.display = isTeacher ? '' : 'none';
             let html = '<div class="eval-list">';
             this.groups.getAll().forEach((g, i) => {
-                const members = this.groups.getMemberList(i);
+                const members = this._getSortedMembers(i);
                 const isOpen = this._openGroups.has(i);
                 html += `<div class="group-card${isOpen ? ' open' : ''}" style="padding:0;">
                 <div style="display:flex; align-items:stretch;">
@@ -86,13 +93,13 @@ class GroupPanel {
                     <div style="border-top:1px solid #f1f5f9; padding-top:10px;">`;
                 if (members.length > 0) {
                     html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
-                    members.sort((a, b) => a.localeCompare(b)).forEach((m, mi) => {
+                    members.forEach((m, mi) => {
                         const encName = this._escapeHtml(m);
                         html += `<div class="member-row" style="display:flex; align-items:center; gap:8px; padding:2px 0;">
                         <span style="flex:1; background:#f1f5f9; padding:6px 14px; border-radius:20px; font-size:13px; color:#475569; font-weight:500;">${mi + 1}. ${encName}</span>
                         ${isTeacher ? `<div style="display:flex; gap:4px; flex-shrink:0;">
-                            <button class="edit-member-btn" data-group="${i}" data-member="${encName}" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:15px; width:34px; height:34px; padding:4px; border-radius:6px; display:flex; align-items:center; justify-content:center;" title="Rename member">&#9998;</button>
-                            <button class="remove-member-btn" data-group="${i}" onclick="event.stopPropagation();window.app.groupPanel._removeMember(${i},decodeURIComponent('${encodeURIComponent(m)}'))" style="background:linear-gradient(135deg,#fee2e2,#fecaca); border:none; color:#dc2626; cursor:pointer; font-size:20px; width:36px; height:34px; padding:4px; border-radius:8px; display:flex; align-items:center; justify-content:center;" title="Remove member">&times;</button>
+                            <button class="edit-member-btn" data-group="${i}" data-member-index="${mi}" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:15px; width:34px; height:34px; padding:4px; border-radius:6px; display:flex; align-items:center; justify-content:center;" title="Rename member">&#9998;</button>
+                            <button class="remove-member-btn" data-group="${i}" data-member-index="${mi}" style="background:linear-gradient(135deg,#fee2e2,#fecaca); border:none; color:#dc2626; cursor:pointer; font-size:20px; width:36px; height:34px; padding:4px; border-radius:8px; display:flex; align-items:center; justify-content:center;" title="Remove member">&times;</button>
                         </div>` : ''}
                     </div>`;
                     });
@@ -166,6 +173,10 @@ class GroupPanel {
     _addMember(groupIndex, name) {
         const g = this.groups.get(groupIndex);
         if (!g) return;
+        if (!EvaluationKey.isIdentity(name)) {
+            alert('Member names must be 1–120 characters without colons, control characters, or reserved names.');
+            return;
+        }
         const members = this.groups.getMemberList(groupIndex);
         if (members.includes(name)) { alert(`"${name}" is already in this group.`); return; }
         members.push(name);
@@ -191,6 +202,10 @@ class GroupPanel {
         if (!g) return;
         const name = prompt('Enter new group name:', g.name);
         if (name && name.trim() && name.trim() !== g.name) {
+            if (!EvaluationKey.isIdentity(name.trim())) {
+                alert('Group names must be 1–120 characters without colons, control characters, or reserved names.');
+                return;
+            }
             g.name = name.trim();
             this.storage.saveGroups(this.groups.toJSON());
             this.buildList();
@@ -202,6 +217,10 @@ class GroupPanel {
         if (!g) return;
         const name = prompt('Enter new name:', oldName);
         if (name && name.trim() && name.trim() !== oldName) {
+            if (!EvaluationKey.isIdentity(name.trim())) {
+                alert('Member names must be 1–120 characters without colons, control characters, or reserved names.');
+                return;
+            }
             const members = this.groups.getMemberList(groupIndex);
             const idx = members.indexOf(oldName);
             if (idx !== -1) {
@@ -213,9 +232,11 @@ class GroupPanel {
         }
     }
 
+    _getSortedMembers(groupIndex) {
+        return this.groups.getMemberList(groupIndex).sort((a, b) => a.localeCompare(b));
+    }
+
     _escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return SafeHtml.escapeText(str);
     }
 }

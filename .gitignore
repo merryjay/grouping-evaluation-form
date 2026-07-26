@@ -7,6 +7,9 @@
 !js/**/
 !.gitignore
 !netlify.toml
+!.firebaserc
+!firebase.json
+!firestore.rules
 !_redirects
 !test/
 !test/**/*

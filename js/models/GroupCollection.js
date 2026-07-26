@@ -4,7 +4,26 @@ class GroupCollection {
     }
 
     fromJSON(data) {
-        this.groups = Array.isArray(data) ? data.map(g => ({ ...g })) : [];
+        this.groups = [];
+        if (!Array.isArray(data)) return this;
+        for (const group of data.slice(0, 100)) {
+            if (!group || typeof group !== 'object' || Array.isArray(group)
+                || !EvaluationKey.isIdentity(group.name)
+                || typeof group.members !== 'string' || group.members.length > 12000) continue;
+            const members = group.members === '' ? [] : group.members.split(/\r?\n/);
+            if (members.length > 100) continue;
+            const normalizedMembers = [];
+            let valid = true;
+            for (const member of members) {
+                const name = member.trim();
+                if (!EvaluationKey.isIdentity(name)) {
+                    valid = false;
+                    break;
+                }
+                normalizedMembers.push(name);
+            }
+            if (valid) this.groups.push({ name: group.name, members: normalizedMembers.join('\n') });
+        }
         return this;
     }
 
@@ -22,7 +41,7 @@ class GroupCollection {
 
     getMemberList(index) {
         const g = this.groups[index];
-        if (!g || !g.members) return [];
+        if (!g || typeof g.members !== 'string' || !g.members) return [];
         return g.members.split('\n').map(m => m.trim()).filter(m => m);
     }
 
