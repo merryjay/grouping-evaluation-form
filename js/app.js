@@ -171,7 +171,7 @@ class App {
             } catch (e) {}
             this.currentVoter = loginName;
             this.isTeacher = false;
-            this.voterGroupIndex = null;
+            this.voterGroupIndex = this._findVoterGroupIndex(loginName);
             const existing = this.voters.find(v => v.name.toLowerCase() === loginName.toLowerCase());
             if (!existing) {
                 this.voters.push({ name: loginName, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: true });
@@ -444,6 +444,15 @@ class App {
         return accounts[name.toLowerCase().trim()] === password;
     }
 
+    _findVoterGroupIndex(name) {
+        const nameLower = name.toLowerCase().trim();
+        for (let i = 0; i < this.groups.size(); i++) {
+            const members = this.groups.getMemberList(i);
+            if (members.some(m => m.toLowerCase().trim() === nameLower)) return i;
+        }
+        return null;
+    }
+
     _setupTabListeners() {
         this.tabManager.tabs.forEach(tab => {
             tab.addEventListener('click', () => {
@@ -477,7 +486,6 @@ class App {
         }
 
         if (tabId === 'results') {
-            this.auth.lockResults();
             this._refreshResults();
             this._resultsInterval = setInterval(() => this._refreshResults(), 3000);
         }
@@ -488,9 +496,13 @@ class App {
         const allEntries = this.evaluations.getAllEntries();
         const votersMap = {};
         allEntries.forEach(e => {
-            if (!votersMap[e.voter]) votersMap[e.voter] = { count: 0, groups: [] };
-            votersMap[e.voter].count++;
+            if (!votersMap[e.voter]) votersMap[e.voter] = { groupCount: 0, memberCount: 0, groups: [] };
             votersMap[e.voter].groups.push(e.groupIndex);
+            if (e.type === 'member') {
+                votersMap[e.voter].memberCount++;
+            } else {
+                votersMap[e.voter].groupCount++;
+            }
         });
         const allNames = Object.keys(votersMap).sort();
         if (allNames.length === 0) {
@@ -498,16 +510,17 @@ class App {
             return;
         }
         const totalGroups = this.groups.size();
-        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Groups Rated</th><th>Status</th></tr>';
+        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Groups Rated</th><th>Members Rated</th><th>Status</th></tr>';
         allNames.forEach((name, i) => {
-            const voterData = votersMap[name];
-            const groupsRated = voterData ? voterData.count : 0;
-            const statusClass = groupsRated > 0 ? 'grade-A' : 'grade-D';
-            const statusText = groupsRated > 0 ? 'Voted' : 'Not yet';
+            const v = votersMap[name];
+            const totalVotes = v.groupCount + v.memberCount;
+            const statusClass = totalVotes > 0 ? 'grade-A' : 'grade-D';
+            const statusText = totalVotes > 0 ? 'Voted' : 'Not yet';
             html += `<tr>
                 <td>${i + 1}</td>
                 <td><strong>${name}</strong></td>
-                <td>${groupsRated} / ${totalGroups}</td>
+                <td>${v.groupCount} / ${totalGroups}</td>
+                <td>${v.memberCount}</td>
                 <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
             </tr>`;
         });

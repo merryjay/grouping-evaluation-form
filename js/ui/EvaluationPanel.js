@@ -6,6 +6,7 @@ class EvaluationPanel {
         this.scoring = scoringService;
         this.storage = storageService;
         this.selectedGroupIndex = null;
+        this.mode = 'group';
 
         this.el = {
             grid: document.getElementById('groupsEvaluationGrid'),
@@ -30,6 +31,8 @@ class EvaluationPanel {
         const labels = this.rubric.getScoreLabels();
         let html = '';
 
+        html += this._buildModeToggle();
+
         const groupsToRender = selectedGroupIndex !== null
             ? [this.groups.get(selectedGroupIndex)].filter(Boolean)
             : this.groups.getAll();
@@ -45,59 +48,15 @@ class EvaluationPanel {
 
         groupsToRender.forEach((group, gi) => {
             const actualIndex = selectedGroupIndex !== null ? selectedGroupIndex : this.groups.getAll().indexOf(group);
-            let evalData = this.evaluations.get(actualIndex) || {};
-            if (!window.app || !window.app.isTeacher) evalData = {};
             const memberList = this.groups.getMemberList(actualIndex);
             const voter = window.app && window.app.currentVoter;
             const isOwnGroup = window.app && !window.app.isTeacher && window.app.voterGroupIndex === actualIndex;
-            const hasVoted = voter && !window.app.isTeacher && this.evaluations.get(actualIndex, voter);
 
-            html += `<div class="group-card" id="group-card-${actualIndex}" style="${isOwnGroup ? 'opacity:0.7;' : ''}">`;
-            html += `<div class="eval-toggle" data-target="${actualIndex}" style="cursor:${isOwnGroup || hasVoted ? 'default' : 'pointer'};">`;
-            html += `<div style="display:flex; justify-content:space-between; align-items:center;">`;
-            html += `<div class="group-name" style="font-size:16px; font-weight:700; color:#1e293b;">${this._escapeHtml(group.name)}${isOwnGroup ? ' <span style="font-size:10px;color:#e74c3c;font-weight:600;background:#fee2e2;padding:2px 8px;border-radius:10px;margin-left:6px;">YOUR GROUP</span>' : ''}${hasVoted ? ' <span style="font-size:10px;color:#059669;font-weight:600;background:#d1fae5;padding:2px 8px;border-radius:10px;margin-left:6px;">✓ VOTED</span>' : ''}</div>`;
-            html += `<div style="display:flex; align-items:center; gap:8px;">`;
-            if (!isOwnGroup && !hasVoted) {
-                html += `<span class="eval-toggle-icon" style="font-size:14px; color:#94a3b8;">&#9660;</span>`;
-            }
-            html += `</div></div>`;
-            html += `<div style="font-size:12px; color:#94a3b8; margin-top:4px;">${memberList.length} member${memberList.length !== 1 ? 's' : ''}</div>`;
-            html += `</div>`;
-
-            if (isOwnGroup) {
-                html += `<div style="padding:14px;text-align:center;color:#94a3b8;font-size:13px;">You cannot rate your own group.</div>`;
-            } else if (hasVoted) {
-                html += `<div style="padding:14px;text-align:center;">
-                    <p style="color:#059669;font-size:14px;font-weight:600;">✓ You have already rated this group.</p>
-                </div>`;
+            if (this.mode === 'member') {
+                html += this._buildMemberCard(actualIndex, group, memberList, voter, isOwnGroup, labels);
             } else {
-                html += `<div class="eval-body" id="eval-body-${actualIndex}" style="display:none; margin-top:12px;">`;
-                html += `<div class="rating-section">`;
-                html += `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px;">`;
-
-                this.rubric.criteria.forEach((c, ci) => {
-                    const currentScore = evalData.scores ? evalData.scores[c.name] : 0;
-                    const scoreLabel = currentScore > 0 ? labels[currentScore - 1] : '';
-                    html += `<div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:10px;">`;
-                    html += `<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">${this._escapeHtml(c.name)}</div>`;
-                    html += `<div class="star-rating" data-group="${actualIndex}" data-criterion="${ci}">`;
-                    for (let s = 1; s <= this.rubric.maxScore; s++) {
-                        const selectedClass = s === currentScore ? 'selected' : '';
-                        html += `<button class="star-btn ${selectedClass}" data-score="${s}">${s}</button>`;
-                    }
-                    html += `</div>`;
-                    html += `</div>`;
-                });
-
-                html += `</div>`;
-                html += `<div style="display:flex; gap:8px; margin-top:12px;">`;
-                html += `<button class="save-group-btn" data-group-index="${actualIndex}" style="flex:1;">Submit Vote</button>`;
-                if (evalData.scores && window.app && window.app.isTeacher) {
-                    html += `<button class="btn btn-danger delete-eval-btn" data-group="${actualIndex}" style="flex:0 0 auto; padding:10px 16px; font-size:13px; width:auto;">Delete</button>`;
-                }
-                html += `</div></div>`;
+                html += this._buildGroupCard(actualIndex, group, memberList, voter, isOwnGroup, labels);
             }
-            html += `</div></div>`;
         });
 
         this.el.grid.innerHTML = html;
@@ -113,6 +72,127 @@ class EvaluationPanel {
             }
         }
 
+        this._bindGroupEvents();
+        if (this.mode === 'member') this._bindMemberEvents();
+    }
+
+    _buildModeToggle() {
+        return `<div style="display:flex; gap:8px; margin-bottom:16px; background:#f1f5f9; border-radius:12px; padding:4px;">
+            <button class="eval-mode-btn" data-mode="group" style="flex:1; padding:10px 16px; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; ${this.mode === 'group' ? 'background:white; color:#667eea; box-shadow:0 2px 8px rgba(0,0,0,0.1);' : 'background:transparent; color:#64748b;'}">Rate by Group</button>
+            <button class="eval-mode-btn" data-mode="member" style="flex:1; padding:10px 16px; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; ${this.mode === 'member' ? 'background:white; color:#667eea; box-shadow:0 2px 8px rgba(0,0,0,0.1);' : 'background:transparent; color:#64748b;'}">Rate by Person</button>
+        </div>`;
+    }
+
+    _buildGroupCard(actualIndex, group, memberList, voter, isOwnGroup, labels) {
+        const hasVoted = voter && !window.app.isTeacher && this.evaluations.getGroupEval(actualIndex, voter);
+        let html = `<div class="group-card" id="group-card-${actualIndex}">`;
+        html += `<div class="eval-toggle" data-target="${actualIndex}" style="cursor:${isOwnGroup || hasVoted ? 'default' : 'pointer'};">`;
+        html += `<div style="display:flex; justify-content:space-between; align-items:center;">`;
+        html += `<div class="group-name" style="font-size:16px; font-weight:700; color:#1e293b;">${this._escapeHtml(group.name)}${isOwnGroup ? ' <span style="font-size:10px;color:#e74c3c;font-weight:600;background:#fee2e2;padding:2px 8px;border-radius:10px;margin-left:6px;">YOUR GROUP</span>' : ''}${hasVoted ? ' <span style="font-size:10px;color:#059669;font-weight:600;background:#d1fae5;padding:2px 8px;border-radius:10px;margin-left:6px;">✓ VOTED</span>' : ''}</div>`;
+        html += `<div style="display:flex; align-items:center; gap:8px;">`;
+        if (!isOwnGroup && !hasVoted) {
+            html += `<span class="eval-toggle-icon" style="font-size:14px; color:#94a3b8;">&#9660;</span>`;
+        }
+        html += `</div></div>`;
+        html += `<div style="font-size:12px; color:#94a3b8; margin-top:4px;">${memberList.length} member${memberList.length !== 1 ? 's' : ''}</div>`;
+        html += `</div>`;
+
+        if (isOwnGroup) {
+            html += `<div style="padding:14px;text-align:center;color:#94a3b8;font-size:13px;">You cannot rate your own group.</div>`;
+        } else if (hasVoted) {
+            html += `<div style="padding:14px;text-align:center;">
+                <p style="color:#059669;font-size:14px;font-weight:600;">✓ You have already rated this group.</p>
+            </div>`;
+        } else {
+            html += `<div class="eval-body" id="eval-body-${actualIndex}" style="display:none; margin-top:12px;">`;
+            html += this._buildRubricHTML(actualIndex, labels);
+            html += `</div>`;
+        }
+        html += `</div>`;
+        return html;
+    }
+
+    _buildMemberCard(actualIndex, group, memberList, voter, isOwnGroup, labels) {
+        let html = `<div class="group-card" id="member-card-${actualIndex}">`;
+        html += `<div class="member-toggle" data-target="${actualIndex}" style="cursor:pointer;">`;
+        html += `<div style="display:flex; justify-content:space-between; align-items:center;">`;
+        html += `<div class="group-name" style="font-size:16px; font-weight:700; color:#1e293b;">${this._escapeHtml(group.name)}${isOwnGroup ? ' <span style="font-size:10px;color:#e74c3c;font-weight:600;background:#fee2e2;padding:2px 8px;border-radius:10px;margin-left:6px;">YOUR GROUP</span>' : ''}</div>`;
+        html += `<span style="font-size:12px; color:#94a3b8;">${memberList.length} member${memberList.length !== 1 ? 's' : ''}</span>`;
+        html += `</div></div>`;
+
+        html += `<div class="member-body" id="member-body-${actualIndex}" style="display:none; margin-top:12px;">`;
+        html += `<div style="border-top:1px solid #f1f5f9; padding-top:12px;">`;
+        html += `<h4 style="font-size:11px; text-transform:uppercase; color:#94a3b8; margin-bottom:10px; font-weight:600; letter-spacing:1px;">Select a member to rate</h4>`;
+        html += `<div style="display:flex; flex-direction:column; gap:6px;">`;
+
+        memberList.sort((a, b) => a.localeCompare(b)).forEach((m, mi) => {
+            const isSelf = voter && m.toLowerCase().trim() === voter.toLowerCase().trim();
+            const hasRated = voter && this.evaluations.getMemberEval(actualIndex, m, voter);
+            const encName = this._escapeHtml(m);
+            html += `<div class="member-rating-row" data-group="${actualIndex}" data-member="${encName}" style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:${isSelf ? '#f1f5f9' : (hasRated ? '#d1fae5' : '#f8fafc')}; border:1px solid ${hasRated ? '#a7f3d0' : '#e2e8f0'}; border-radius:10px; cursor:${isSelf || hasRated ? 'default' : 'pointer'}; transition:all 0.2s;">
+                <span style="font-size:13px; font-weight:600; color:#475569; flex:1;">${mi + 1}. ${encName}</span>
+                ${isSelf ? '<span style="font-size:10px;color:#94a3b8;">You</span>' : ''}
+                ${hasRated ? '<span style="font-size:10px;color:#059669;font-weight:600;">✓ Rated</span>' : '<span style="font-size:10px;color:#667eea;font-weight:600;">Rate</span>'}
+            </div>`;
+            html += `<div class="member-eval-form" id="member-eval-${actualIndex}-${mi}" style="display:none; margin-top:4px; padding:10px; background:white; border:1px solid #e2e8f0; border-radius:10px;" data-group="${actualIndex}" data-member="${m}"></div>`;
+        });
+
+        html += `</div></div>`;
+        html += `</div>`;
+        html += `</div>`;
+        return html;
+    }
+
+    _buildRubricHTML(groupIndex, labels) {
+        let html = `<div class="rating-section">`;
+        html += `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px;">`;
+        this.rubric.criteria.forEach((c, ci) => {
+            html += `<div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:10px;">`;
+            html += `<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">${this._escapeHtml(c.name)}</div>`;
+            html += `<div class="star-rating" data-group="${groupIndex}" data-criterion="${ci}">`;
+            for (let s = 1; s <= this.rubric.maxScore; s++) {
+                html += `<button class="star-btn" data-score="${s}">${s}</button>`;
+            }
+            html += `</div>`;
+            html += `</div>`;
+        });
+        html += `</div>`;
+        html += `<div style="display:flex; gap:8px; margin-top:12px;">`;
+        html += `<button class="save-group-btn" data-group-index="${groupIndex}" style="flex:1;">Submit Vote</button>`;
+        html += `</div></div>`;
+        return html;
+    }
+
+    _buildMemberRubricHTML(groupIndex, memberName, labels) {
+        const voter = window.app && window.app.currentVoter;
+        const existing = this.evaluations.getMemberEval(groupIndex, memberName, voter);
+        const currentScores = existing ? existing.scores : {};
+        let html = `<div class="rating-section">`;
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:700; color:#1e293b;">${this._escapeHtml(memberName)}</span>
+            <span style="font-size:10px; color:#94a3b8;">Rate each criterion</span>
+        </div>`;
+        html += `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px;">`;
+        this.rubric.criteria.forEach((c, ci) => {
+            const currentScore = currentScores[c.name] || 0;
+            html += `<div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:10px;">`;
+            html += `<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">${this._escapeHtml(c.name)}</div>`;
+            html += `<div class="star-rating" data-group="${groupIndex}" data-member="${this._escapeHtml(memberName)}" data-criterion="${ci}">`;
+            for (let s = 1; s <= this.rubric.maxScore; s++) {
+                const selectedClass = s === currentScore ? 'selected' : '';
+                html += `<button class="star-btn ${selectedClass}" data-score="${s}">${s}</button>`;
+            }
+            html += `</div>`;
+            html += `</div>`;
+        });
+        html += `</div>`;
+        html += `<div style="display:flex; gap:8px; margin-top:12px;">`;
+        html += `<button class="save-member-btn" data-group="${groupIndex}" data-member="${this._escapeHtml(memberName)}" style="flex:1; padding:10px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">Submit Rating</button>`;
+        html += `</div></div>`;
+        return html;
+    }
+
+    _bindGroupEvents() {
         this.el.grid.querySelectorAll('.eval-toggle').forEach(el => {
             el.addEventListener('click', () => {
                 const target = parseInt(el.dataset.target);
@@ -137,23 +217,59 @@ class EvaluationPanel {
             });
         });
 
-        this.el.grid.querySelectorAll('.delete-eval-btn').forEach(btn => {
+        this.el.grid.querySelectorAll('.eval-mode-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._clearEvaluation(parseInt(btn.dataset.group));
+                this.mode = btn.dataset.mode;
                 this.buildGrid();
             });
         });
+    }
 
-        this.el.grid.querySelectorAll('.change-vote-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const groupIndex = parseInt(btn.dataset.group);
-                this._enableReVote(groupIndex);
+    _bindMemberEvents() {
+        this.el.grid.querySelectorAll('.member-toggle').forEach(el => {
+            el.addEventListener('click', () => {
+                const target = parseInt(el.dataset.target);
+                const body = document.getElementById(`member-body-${target}`);
+                if (body) {
+                    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+                }
             });
         });
 
+        this.el.grid.querySelectorAll('.member-rating-row').forEach(row => {
+            row.addEventListener('click', (e) => {
+                const voter = window.app && window.app.currentVoter;
+                const memberName = row.dataset.member;
+                if (voter && memberName.toLowerCase().trim() === voter.toLowerCase().trim()) return;
+                const groupIndex = parseInt(row.dataset.group);
+                this._toggleMemberForm(groupIndex, memberName);
+            });
+        });
 
+        this.el.grid.querySelectorAll('.star-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const parent = btn.closest('.star-rating');
+                parent.querySelectorAll('.star-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            });
+        });
+
+        this.el.grid.querySelectorAll('.save-member-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const groupIndex = parseInt(btn.dataset.group);
+                const memberName = btn.dataset.member;
+                this._saveMemberEvaluation(groupIndex, memberName);
+            });
+        });
+
+        this.el.grid.querySelectorAll('.eval-mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.mode = btn.dataset.mode;
+                this.buildGrid();
+            });
+        });
     }
 
     _toggleBody(groupIndex) {
@@ -171,6 +287,47 @@ class EvaluationPanel {
                 const card = document.getElementById(`group-card-${groupIndex}`);
                 if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }, 50);
+        }
+    }
+
+    _toggleMemberForm(groupIndex, memberName) {
+        const voter = window.app && window.app.currentVoter;
+        const labels = this.rubric.getScoreLabels();
+
+        const memberList = this.groups.getMemberList(groupIndex);
+        const mi = memberList.findIndex(m => m === memberName);
+        if (mi === -1) return;
+
+        const formId = `member-eval-${groupIndex}-${mi}`;
+        const form = document.getElementById(formId);
+        if (!form) return;
+
+        const isVisible = form.style.display !== 'none';
+        if (isVisible) {
+            form.style.display = 'none';
+            form.innerHTML = '';
+        } else {
+            const allForms = document.querySelectorAll('.member-eval-form');
+            allForms.forEach(f => { f.style.display = 'none'; f.innerHTML = ''; });
+            form.innerHTML = this._buildMemberRubricHTML(groupIndex, memberName, labels);
+            form.style.display = 'block';
+
+            form.querySelectorAll('.star-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const parent = btn.closest('.star-rating');
+                    parent.querySelectorAll('.star-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                });
+            });
+
+            const saveBtn = form.querySelector('.save-member-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this._saveMemberEvaluation(groupIndex, memberName);
+                });
+            }
         }
     }
 
@@ -196,18 +353,19 @@ class EvaluationPanel {
                 const selected = container ? container.querySelector('.star-btn.selected') : null;
                 scores[c.name] = selected ? parseInt(selected.dataset.score) : 0;
             });
+
             const result = this.scoring.calculate(scores);
 
             await this.storage.pb.saveEvaluation(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
 
-            this.evaluations.save(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            this.evaluations.saveGroup(groupIndex, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
             localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
             let voters = window.app.storage.loadVoters();
             const vl = voter.toLowerCase();
             let v = voters.find(x => x.name.toLowerCase() === vl);
             if (!v) {
-                voters.push({ name: voter, hasVoted: false, votedCount: 0, ratedGroups: [], loggedIn: false });
+                voters.push({ name: voter, hasVoted: false, votedCount: 0, ratedGroups: [], ratedMembers: [], loggedIn: false });
                 v = voters[voters.length - 1];
             }
             v.hasVoted = true;
@@ -227,6 +385,58 @@ class EvaluationPanel {
         }
     }
 
+    async _saveMemberEvaluation(groupIndex, memberName) {
+        const voter = this._getVoter();
+        if (voter === 'unknown') return;
+
+        const isSelf = voter.toLowerCase().trim() === memberName.toLowerCase().trim();
+        if (isSelf) {
+            alert('You cannot rate yourself.');
+            return;
+        }
+
+        const scores = {};
+        const form = this.el.grid.querySelector(`.member-eval-form[data-group="${groupIndex}"][data-member="${memberName}"]`);
+        if (!form) return;
+
+        this.rubric.criteria.forEach((c, ci) => {
+            const container = form.querySelector(`.star-rating[data-group="${groupIndex}"][data-member="${memberName}"][data-criterion="${ci}"]`);
+            const selected = container ? container.querySelector('.star-btn.selected') : null;
+            scores[c.name] = selected ? parseInt(selected.dataset.score) : 0;
+        });
+
+        const saveBtn = form.querySelector('.save-member-btn');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+
+        try {
+            const result = this.scoring.calculate(scores);
+
+            await this.storage.pb.saveMemberEvaluation(groupIndex, memberName, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+
+            this.evaluations.saveMember(groupIndex, memberName, scores, result.totalRaw, result.totalWeighted, result.grade, voter);
+            localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
+
+            let voters = window.app.storage.loadVoters();
+            const vl = voter.toLowerCase();
+            let v = voters.find(x => x.name.toLowerCase() === vl);
+            if (!v) {
+                voters.push({ name: voter, hasVoted: false, votedCount: 0, ratedGroups: [], ratedMembers: [], loggedIn: false });
+                v = voters[voters.length - 1];
+            }
+            const ratedMembers = new Set(v.ratedMembers || []);
+            ratedMembers.add(`${groupIndex}:${memberName}`);
+            v.ratedMembers = [...ratedMembers];
+            window.app.storage.saveVoters(voters);
+            window.app.voters = voters;
+
+            if (saveBtn) saveBtn.textContent = '✓ Saved';
+            this.buildGrid();
+            if (window.app.resultsPanel) window.app.resultsPanel.showPasswordPrompt();
+        } catch (e) {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Submit Rating'; }
+        }
+    }
+
     async _clearEvaluation(groupIndex) {
         const voter = this._getVoter();
         if (voter === 'unknown') return;
@@ -234,7 +444,7 @@ class EvaluationPanel {
         if (!confirm(`Clear your ratings for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
 
         await this.storage.pb.deleteEvaluation(groupIndex, voter);
-        this.evaluations.delete(groupIndex, voter);
+        this.evaluations.deleteGroup(groupIndex, voter);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
 
         let voters = window.app.storage.loadVoters();
@@ -263,7 +473,7 @@ class EvaluationPanel {
         const container = body.querySelector('.save-group-btn').parentNode;
         const existingDelete = container.querySelector('.delete-eval-btn');
         const voter = this._getVoter();
-        const hasEval = this.evaluations.get(groupIndex, voter) !== null;
+        const hasEval = this.evaluations.getGroupEval(groupIndex, voter) !== null;
 
         if (hasEval && !existingDelete) {
             const delBtn = document.createElement('button');
@@ -285,7 +495,7 @@ class EvaluationPanel {
         const voter = this._getVoter();
         if (voter === 'unknown') return;
         await this.storage.pb.deleteEvaluation(groupIndex, voter);
-        this.evaluations.delete(groupIndex, voter);
+        this.evaluations.deleteGroup(groupIndex, voter);
         localStorage.setItem('pbEvals', JSON.stringify(this.evaluations.toJSON()));
         this.buildGrid();
     }

@@ -68,11 +68,17 @@ class PocketBaseService {
         if (!data || !data.items) return {};
         const result = {};
         for (const item of data.items) {
-            const gi = item.data ? item.data.groupIndex : undefined;
-            if (gi === null || gi === undefined || isNaN(gi)) continue;
-            const voterName = item.voter || (item.data ? item.data.voter : null) || 'unknown';
-            const key = `${gi}_${voterName}`;
-            result[key] = { scores: item.data.scores, totalRaw: item.data.totalRaw, totalWeighted: item.data.totalWeighted, grade: item.data.grade, date: item.data.date, id: item.id, voter: voterName };
+            const d = item.data;
+            if (!d || d.groupIndex === null || d.groupIndex === undefined || isNaN(d.groupIndex)) continue;
+            const voterName = item.voter || d.voter || 'unknown';
+            const type = d.type || 'group';
+            if (type === 'member' && d.memberName) {
+                const key = `m:${d.groupIndex}:${d.memberName}:${voterName}`;
+                result[key] = { scores: d.scores, totalRaw: d.totalRaw, totalWeighted: d.totalWeighted, grade: d.grade, date: d.date, id: item.id, voter: voterName, memberName: d.memberName };
+            } else {
+                const key = `g:${d.groupIndex}:${voterName}`;
+                result[key] = { scores: d.scores, totalRaw: d.totalRaw, totalWeighted: d.totalWeighted, grade: d.grade, date: d.date, id: item.id, voter: voterName };
+            }
         }
         return result;
     }
@@ -81,8 +87,32 @@ class PocketBaseService {
         const all = await this._fetch(`${this.baseUrl}/api/collections/evaluations/records?perPage=500`);
         if (!all) return;
         const vl = voter.toLowerCase();
-        const existing = all.items.find(i => i.data && i.data.groupIndex === groupIndex && (i.voter && i.voter.toLowerCase() === vl || i.data.voter && i.data.voter.toLowerCase() === vl));
-        const body = JSON.stringify({ data: { groupIndex, scores, totalRaw, totalWeighted, grade, date: new Date().toLocaleDateString() }, voter });
+        const existing = all.items.find(i => {
+            const d = i.data;
+            return d && d.groupIndex === groupIndex && d.type !== 'member' && (i.voter && i.voter.toLowerCase() === vl || d.voter && d.voter.toLowerCase() === vl);
+        });
+        const body = JSON.stringify({ data: { type: 'group', groupIndex, scores, totalRaw, totalWeighted, grade, date: new Date().toLocaleDateString() }, voter });
+        if (existing) {
+            await this._fetch(`${this.baseUrl}/api/collections/evaluations/records/${existing.id}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body
+            });
+        } else {
+            await this._fetch(`${this.baseUrl}/api/collections/evaluations/records`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body
+            });
+        }
+    }
+
+    async saveMemberEvaluation(groupIndex, memberName, scores, totalRaw, totalWeighted, grade, voter) {
+        const all = await this._fetch(`${this.baseUrl}/api/collections/evaluations/records?perPage=500`);
+        if (!all) return;
+        const vl = voter.toLowerCase();
+        const ml = memberName.toLowerCase();
+        const existing = all.items.find(i => {
+            const d = i.data;
+            return d && d.type === 'member' && d.groupIndex === groupIndex && d.memberName && d.memberName.toLowerCase() === ml && (i.voter && i.voter.toLowerCase() === vl || d.voter && d.voter.toLowerCase() === vl);
+        });
+        const body = JSON.stringify({ data: { type: 'member', groupIndex, memberName, scores, totalRaw, totalWeighted, grade, date: new Date().toLocaleDateString() }, voter });
         if (existing) {
             await this._fetch(`${this.baseUrl}/api/collections/evaluations/records/${existing.id}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body
@@ -98,7 +128,24 @@ class PocketBaseService {
         const all = await this._fetch(`${this.baseUrl}/api/collections/evaluations/records?perPage=500`);
         if (!all) return;
         const vl = voter ? voter.toLowerCase() : null;
-        const items = all.items.filter(i => i.data && i.data.groupIndex === groupIndex && (!voter || i.voter && i.voter.toLowerCase() === vl || i.data.voter && i.data.voter.toLowerCase() === vl));
+        const items = all.items.filter(i => {
+            const d = i.data;
+            return d && d.groupIndex === groupIndex && d.type !== 'member' && (!voter || i.voter && i.voter.toLowerCase() === vl || d.voter && d.voter.toLowerCase() === vl);
+        });
+        for (const item of items) {
+            await this._fetch(`${this.baseUrl}/api/collections/evaluations/records/${item.id}`, { method: 'DELETE' });
+        }
+    }
+
+    async deleteMemberEvaluation(groupIndex, memberName, voter) {
+        const all = await this._fetch(`${this.baseUrl}/api/collections/evaluations/records?perPage=500`);
+        if (!all) return;
+        const vl = voter ? voter.toLowerCase() : null;
+        const ml = memberName ? memberName.toLowerCase() : null;
+        const items = all.items.filter(i => {
+            const d = i.data;
+            return d && d.type === 'member' && d.groupIndex === groupIndex && (!ml || d.memberName && d.memberName.toLowerCase() === ml) && (!vl || i.voter && i.voter.toLowerCase() === vl || d.voter && d.voter.toLowerCase() === vl);
+        });
         for (const item of items) {
             await this._fetch(`${this.baseUrl}/api/collections/evaluations/records/${item.id}`, { method: 'DELETE' });
         }
@@ -116,37 +163,6 @@ class PocketBaseService {
         const data = await this._fetch(`${this.baseUrl}/api/collections/voters/records`);
         if (data && data.items) return data.items.map(i => i.data);
         return [];
-    }
-
-    async _cleanInvalidEvaluations() {
-        const all = await this._fetch(`${this.baseUrl}/api/collections/evaluations/records?perPage=500`);
-        if (!all) return 0;
-        let deleted = 0;
-        for (const item of all.items) {
-            const gi = item.data ? item.data.groupIndex : undefined;
-            if (gi === null || gi === undefined || gi === '' || isNaN(gi)) {
-                await this._fetch(`${this.baseUrl}/api/collections/evaluations/records/${item.id}`, { method: 'DELETE' });
-                deleted++;
-            }
-        }
-        return deleted;
-    }
-
-    async _restoreEvaluations(local) {
-        const all = await this._fetch(`${this.baseUrl}/api/collections/evaluations/records?perPage=500`);
-        if (!all) return;
-        const existingKeys = new Set(all.items.map(i => `${i.data.groupIndex}_${i.voter || i.data.voter || 'unknown'}`));
-        for (const [key, evalData] of Object.entries(local)) {
-            if (existingKeys.has(key)) continue;
-            const under = key.indexOf('_');
-            const groupIndex = parseInt(key.slice(0, under));
-            const voter = key.slice(under + 1);
-            await this._fetch(`${this.baseUrl}/api/collections/evaluations/records`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: { ...evalData, groupIndex }, voter })
-            });
-        }
-        localStorage.setItem('pbEvals', JSON.stringify(local));
     }
 
     async saveVoters(voters) {
