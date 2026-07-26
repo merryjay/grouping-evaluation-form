@@ -57,8 +57,6 @@ class DashboardPanel {
             });
             html += `</table></div></div>`;
 
-            `;
-
         const rubric = this.app.rubric;
         const labels = rubric ? rubric.getScoreLabels() : [];
         html += `<div class="card">
