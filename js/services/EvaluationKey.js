@@ -43,6 +43,9 @@ class EvaluationKey {
             && value.length <= this.MAX_ID_LENGTH
             && value === value.trim()
             && !['__proto__', 'constructor', 'prototype'].includes(value)
-            && !/[:\u0000-\u001F\u007F]/.test(value);
+            // Reject all Unicode "Other" code points. This covers C0/C1
+            // controls, zero-width and bidi format controls, private-use,
+            // surrogate, and unassigned identities before they reach keys.
+            && !/[:\p{C}]/u.test(value);
     }
 }

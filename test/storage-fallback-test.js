@@ -31,7 +31,7 @@ async function runTests() {
 
     await storage.init();
     storage.saveRubric(rubric);
-    storage.saveGroups(groups);
+    await storage.ensureInitialGroups(groups);
     await storage.saveEvaluations(evaluations);
     storage.saveVoters(voters);
 

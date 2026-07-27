@@ -2,6 +2,9 @@
 !.nojekyll
 !index.html
 !rubric-evaluation.html
+!css/
+!css/**/
+!css/**/*
 !js/
 !js/**/*
 !js/**/

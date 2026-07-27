@@ -24,6 +24,10 @@ class App {
         this.voterGroupIndex = null;
         this._studentLoginName = null;
         this._resultsVersion = 0;
+        this._stateVersion = 0;
+        this.rosterRevision = this.storage.getRosterRevision ? this.storage.getRosterRevision() : 0;
+        this._studentLoginState = 'name';
+        this._studentLoginOperation = 0;
 
         window.app = this;
 
@@ -33,18 +37,28 @@ class App {
         this._showRolePicker = () => {};
         this._showNameInput = () => {};
         this._showTeacherPw = () => {};
+        this.showStatus = (message, type = 'info') => {
+            const status = document.getElementById('appStatus');
+            if (!status) return false;
+            status.textContent = message;
+            status.dataset.status = type;
+            if (status.classList) status.classList.add('is-visible');
+            return true;
+        };
 
         const a = window.app;
         a._showRolePicker = () => {
+            this._invalidateStudentLogin();
             const rp = document.getElementById('loginRolePicker');
             const ni = document.getElementById('loginNameInput');
             const tp = document.getElementById('loginTeacherPw');
             if (rp) rp.style.display = 'block';
             if (ni) ni.style.display = 'none';
             if (tp) tp.style.display = 'none';
+            this._updateStudentAccountState('');
         };
         a._showNameInput = () => {
-            this._studentLoginName = null;
+            this._invalidateStudentLogin();
             const rp = document.getElementById('loginRolePicker');
             const ni = document.getElementById('loginNameInput');
             const tp = document.getElementById('loginTeacherPw');
@@ -61,12 +75,16 @@ class App {
             if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Password'; }
             const confirmInput = document.getElementById('studentConfirmPw');
             if (confirmInput) { confirmInput.style.display = 'none'; confirmInput.value = ''; }
+            const confirmLabel = document.getElementById('studentConfirmPwLabel');
+            if (confirmLabel) confirmLabel.style.display = 'none';
             const btn = document.getElementById('voterLoginBtn');
-            if (btn) btn.textContent = 'Enter';
+            if (btn) { btn.textContent = 'Check name'; btn.disabled = false; btn.removeAttribute('aria-busy'); }
+            this._updateStudentAccountState('');
             const inp = document.getElementById('voterNameInput');
             if (inp) { inp.value = ''; inp.focus(); }
         };
         a._showTeacherPw = () => {
+            this._invalidateStudentLogin();
             const rp = document.getElementById('loginRolePicker');
             const ni = document.getElementById('loginNameInput');
             const tp = document.getElementById('loginTeacherPw');
@@ -77,7 +95,7 @@ class App {
             if (inp) inp.focus();
         };
         a._doLogout = () => {
-            this._studentLoginName = null;
+            this._invalidateStudentLogin();
             const wasVoter = this.currentVoter;
             localStorage.removeItem('rubricLoggedInUser');
             localStorage.removeItem('rubricDeviceName');
@@ -86,7 +104,7 @@ class App {
             this.voterGroupIndex = null;
             if (wasVoter) {
                 const v = this.voters.find(x => x.name.toLowerCase() === wasVoter.toLowerCase());
-                if (v) { v.loggedIn = false; this.storage.saveVoters(this.voters); }
+                if (v) { v.loggedIn = false; this.voters = this.storage.replaceVoters(this.voters); }
             }
             this.evaluations.clearAll();
             const lb = document.getElementById('logoutBtn');
@@ -102,93 +120,143 @@ class App {
             const ol = document.getElementById('loginOverlay');
             if (ol) ol.style.display = 'flex';
             a._showRolePicker();
+            const roleContext = document.getElementById('roleContext');
+            if (roleContext) roleContext.textContent = 'Choose a role to begin';
+            this.showStatus('You have been logged out.', 'info');
         };
         a._studentLogin = async () => {
             const nameInput = document.getElementById('voterNameInput');
-            const name = nameInput ? nameInput.value.trim() : '';
+            const name = nameInput ? nameInput.value : '';
             const err = document.getElementById('loginError');
             const pwErr = document.getElementById('studentPwError');
             const pwInput = document.getElementById('studentPassword');
             const confirmInput = document.getElementById('studentConfirmPw');
             const pwArea = document.getElementById('studentPwArea');
             const btn = document.getElementById('voterLoginBtn');
+            if (this._studentLoginState === 'claiming' || this._studentLoginState === 'verifying') return;
+            const operation = ++this._studentLoginOperation;
+            const setBusy = text => {
+                if (btn) { btn.disabled = true; btn.textContent = text; btn.setAttribute('aria-busy', 'true'); }
+            };
+            const endBusy = text => {
+                if (operation !== this._studentLoginOperation) return;
+                if (btn) { btn.disabled = false; btn.textContent = text; btn.removeAttribute('aria-busy'); }
+            };
+            const showError = message => {
+                if (pwErr) { pwErr.textContent = message; pwErr.style.display = 'block'; }
+                this.showStatus(message, 'error');
+            };
+            const stale = () => operation !== this._studentLoginOperation;
 
-            if (!this._studentLoginName) {
-                if (!name) {
+            if (this._studentLoginState === 'name') {
+                if (!name || !name.trim()) {
                     if (err) { err.textContent = 'Please enter your name.'; err.style.display = 'block'; }
                     return;
                 }
-                const membership = this._resolveStudentMembership(name);
-                if (!membership) {
+                if (err) err.style.display = 'none';
+                setBusy('Checking...');
+                const prepared = await this.storage.remote.prepareStudentLogin(name);
+                if (stale()) return;
+                endBusy('Enter');
+                if (!prepared || !prepared.ok) {
                     if (err) {
-                        err.textContent = 'Registration failed. Your name is not listed as an official member. Please contact the administrator.';
+                        err.textContent = prepared && prepared.error === 'credential-service-unavailable'
+                            ? 'Student password service is unavailable. Please try again later.'
+                            : 'Registration failed. Your name is not listed as one unique official member. Please contact the administrator.';
                         err.style.display = 'block';
                     }
+                    this._updateStudentAccountState('');
                     return;
                 }
-                if (err) err.style.display = 'none';
-                this._studentLoginName = membership.name;
+                this._studentLoginName = prepared.membership.name;
+                this._pendingStudentMembership = {
+                    membership: prepared.membership,
+                    rosterRevision: prepared.rosterRevision,
+                    stateVersion: this._stateVersion
+                };
                 if (pwArea) pwArea.style.display = 'flex';
-                if (this._hasStudentPassword(membership.name)) {
+                this._studentLoginState = prepared.status === 'claimed' ? 'existing-password' : 'create-password';
+                if (this._studentLoginState === 'existing-password') {
                     if (confirmInput) confirmInput.style.display = 'none';
+                    const confirmLabel = document.getElementById('studentConfirmPwLabel');
+                    if (confirmLabel) confirmLabel.style.display = 'none';
                     if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Enter your password'; pwInput.focus(); }
-                    if (btn) btn.textContent = 'Log In';
+                    if (pwInput) pwInput.autocomplete = 'current-password';
+                    if (btn) btn.textContent = 'Log in';
+                    this._updateStudentAccountState(`Roster name recognized: ${prepared.membership.name}. Enter your existing password, or change the name above.`);
                 } else {
                     if (confirmInput) { confirmInput.style.display = 'block'; confirmInput.value = ''; }
+                    const confirmLabel = document.getElementById('studentConfirmPwLabel');
+                    if (confirmLabel) confirmLabel.style.display = 'block';
                     if (pwInput) { pwInput.value = ''; pwInput.placeholder = 'Create a password'; pwInput.focus(); }
-                    if (btn) btn.textContent = 'Register';
+                    if (pwInput) pwInput.autocomplete = 'new-password';
+                    if (btn) btn.textContent = 'Create password';
+                    this._updateStudentAccountState(`Roster name recognized: ${prepared.membership.name}. Create a password for this account, or change the name above.`);
                 }
                 return;
             }
 
             const password = pwInput ? pwInput.value : '';
             if (!password) {
-                if (pwErr) { pwErr.textContent = 'Please enter a password.'; pwErr.style.display = 'block'; }
+                showError('Please enter a password.');
                 return;
             }
-            if (this._hasStudentPassword(this._studentLoginName)) {
-                if (!this._checkStudentPassword(this._studentLoginName, password)) {
-                    if (pwErr) { pwErr.textContent = 'Incorrect password. Please try again.'; pwErr.style.display = 'block'; }
-                    return;
-                }
-            } else {
+            if (this._studentLoginState === 'create-password') {
                 const confirm = confirmInput ? confirmInput.value : '';
                 if (password !== confirm) {
-                    if (pwErr) { pwErr.textContent = 'Passwords do not match. Please try again.'; pwErr.style.display = 'block'; }
+                    showError('Passwords do not match. Please try again.');
                     return;
                 }
-                this._saveStudentPassword(this._studentLoginName, password);
+                this._studentLoginState = 'claiming';
+                setBusy('Creating...');
+                const claimed = await this.storage.remote.claimStudentAccount(this._studentLoginName, password);
+                this._clearStudentPasswordFields();
+                if (stale()) return;
+                if (!claimed || !claimed.ok) {
+                    this._studentLoginState = 'create-password';
+                    endBusy('Create password');
+                    showError('Could not create your password. Please try again.');
+                    return;
+                }
+                if (claimed.status === 'already-claimed') {
+                    this._studentLoginState = 'existing-password';
+                    if (confirmInput) confirmInput.style.display = 'none';
+                    const confirmLabel = document.getElementById('studentConfirmPwLabel');
+                    if (confirmLabel) confirmLabel.style.display = 'none';
+                    if (pwInput) { pwInput.placeholder = 'Enter your password'; pwInput.focus(); }
+                    endBusy('Log in');
+                    showError('An account already exists. Enter its password.');
+                    return;
+                }
+                if (pwErr) pwErr.style.display = 'none';
+                endBusy('Log in');
+                return this._finishStudentLogin(claimed.membership, operation, {
+                    rosterRevision: claimed.rosterRevision,
+                    stateVersion: this._stateVersion
+                });
+            }
+
+            if (this._studentLoginState !== 'existing-password') return;
+            this._studentLoginState = 'verifying';
+            setBusy('Verifying...');
+            const authenticated = await this.storage.remote.authenticateStudent(this._studentLoginName, password);
+            this._clearStudentPasswordFields();
+            if (stale()) return;
+            if (!authenticated || !authenticated.ok) {
+                this._studentLoginState = 'existing-password';
+                endBusy('Log in');
+                showError(authenticated && authenticated.error === 'wrong-password' ? 'Incorrect password. Please try again.' : 'Could not verify your password. Please try again.');
+                return;
             }
             if (pwErr) pwErr.style.display = 'none';
-
-            const loginName = this._studentLoginName;
-            this._studentLoginName = null;
-
-            try {
-                const remoteEvals = await this.storage.remote.loadEvaluationsResult();
-                if (remoteEvals.available) {
-                    localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
-                    this.evaluations.fromJSON(remoteEvals.data);
-                }
-            } catch (e) {}
-            this.currentVoter = loginName;
-            this.isTeacher = false;
-            this.voterGroupIndex = this._findVoterGroupIndex(loginName);
-            const existing = this.voters.find(v => v.name.toLowerCase() === loginName.toLowerCase());
-            if (!existing) {
-                this.voters.push({ name: loginName, loggedIn: true });
-            } else {
-                existing.loggedIn = true;
-            }
-            this.voters = this.storage.saveVoters(this.voters);
-            const ol = document.getElementById('loginOverlay');
-            if (ol) ol.style.display = 'none';
-            const lb = document.getElementById('logoutBtn');
-            if (lb) lb.style.display = '';
-            this._applyRoleVisibility();
-            this.evaluationPanel.buildGrid();
+            endBusy('Log In');
+            return this._finishStudentLogin(authenticated.membership, operation, {
+                rosterRevision: authenticated.rosterRevision,
+                stateVersion: this._stateVersion
+            });
         };
         a._teacherLogin = () => {
+            this._invalidateStudentLogin();
             const pwInput = document.getElementById('teacherPasswordInput');
             const pw = pwInput ? pwInput.value : '';
             const err = document.getElementById('teacherLoginError');
@@ -203,6 +271,7 @@ class App {
             if (lb) lb.style.display = '';
             this._applyRoleVisibility();
             this.dashboardPanel.render();
+            this.showStatus('Teacher workspace opened.', 'success');
         };
     }
 
@@ -211,6 +280,8 @@ class App {
             await this.storage.init();
         } catch (e) { console.warn('storage init failed', e); }
         try { this._loadData(); } catch (e) { console.warn('loadData failed', e); }
+        this._removeLegacyStudentAccounts();
+        try { await this._ensureInitialGroups(); } catch (e) { console.warn('initial group seed failed', e); }
         try { this.voters = this.storage.loadVoters(); } catch (e) { console.warn('loadVoters failed', e); }
         try { this.setupPanel.loadRubricIntoUI(); } catch (e) { console.warn('loadRubricIntoUI failed', e); }
         try { this.groupPanel.buildList(); } catch (e) { console.warn('buildList failed', e); }
@@ -242,9 +313,102 @@ class App {
             if (el('backToRolePickerBtn2')) el('backToRolePickerBtn2').addEventListener('click', () => window.app._showRolePicker());
             if (el('voterLoginBtn')) el('voterLoginBtn').addEventListener('click', () => window.app._studentLogin());
             if (el('voterNameInput')) el('voterNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
+            if (el('studentPassword')) el('studentPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
+            if (el('studentConfirmPw')) el('studentConfirmPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._studentLogin(); } });
             if (el('teacherLoginBtn')) el('teacherLoginBtn').addEventListener('click', () => window.app._teacherLogin());
             if (el('teacherPasswordInput')) el('teacherPasswordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.app._teacherLogin(); } });
         } catch (e) { console.warn('Login wiring error', e); }
+    }
+
+    _clearStudentPasswordFields() {
+        const password = document.getElementById('studentPassword');
+        const confirm = document.getElementById('studentConfirmPw');
+        if (password) password.value = '';
+        if (confirm) confirm.value = '';
+    }
+
+    _updateStudentAccountState(message) {
+        const state = document.getElementById('studentAccountState');
+        if (!state) return;
+        state.textContent = message;
+        if (state.classList) state.classList.toggle('is-visible', !!message);
+    }
+
+    _invalidateStudentLogin() {
+        this._studentLoginOperation = (this._studentLoginOperation || 0) + 1;
+        this._studentLoginName = null;
+        this._pendingStudentMembership = null;
+        this._studentLoginState = 'name';
+        this._clearStudentPasswordFields();
+        if (typeof this._updateStudentAccountState === 'function') this._updateStudentAccountState('');
+    }
+
+    _isCurrentStudentLogin(operation, membership, context = {}) {
+        if (operation !== this._studentLoginOperation || !membership || !membership.name
+            || !Number.isSafeInteger(membership.groupIndex)) return false;
+        const current = this._resolveStudentMembership(membership.name);
+        if (!current || current.name !== membership.name || current.groupIndex !== membership.groupIndex) return false;
+        if (Number.isSafeInteger(context.rosterRevision) && this.rosterRevision !== context.rosterRevision) return false;
+        if (Number.isSafeInteger(context.stateVersion) && this._stateVersion !== context.stateVersion) return false;
+        return true;
+    }
+
+    async _finishStudentLogin(membership, operation, context = {}) {
+        if (!this._isCurrentStudentLogin(operation, membership, context)) return false;
+        this._studentLoginName = null;
+        this._pendingStudentMembership = null;
+        this._clearStudentPasswordFields();
+        try {
+            const remoteEvals = await this.storage.remote.loadEvaluationsResult();
+            if (!this._isCurrentStudentLogin(operation, membership, context)) return false;
+            if (remoteEvals.available) {
+                localStorage.setItem('pbEvals', JSON.stringify(remoteEvals.data));
+                this.evaluations.fromJSON(remoteEvals.data);
+            }
+        } catch (e) {}
+        if (!this._isCurrentStudentLogin(operation, membership, context)) return false;
+        try {
+            const prepared = await this.storage.remote.prepareStudentLogin(membership.name);
+            if (!this._isCurrentStudentLogin(operation, membership, context)
+                || !prepared || !prepared.ok || prepared.status !== 'claimed'
+                || prepared.rosterRevision !== context.rosterRevision
+                || prepared.membership.name !== membership.name
+                || prepared.membership.groupIndex !== membership.groupIndex) return false;
+        } catch (e) {
+            return false;
+        }
+        if (!this._isCurrentStudentLogin(operation, membership, context)) return false;
+        this._studentLoginState = 'name';
+        this.currentVoter = membership.name;
+        this.isTeacher = false;
+        this.voterGroupIndex = membership.groupIndex;
+        const existing = this.voters.find(v => FirebaseService._normalizedRosterKey(v.name) === FirebaseService._normalizedRosterKey(membership.name));
+        if (!existing) this.voters.push({ name: membership.name, loggedIn: true });
+        else existing.loggedIn = true;
+        // Login presence is deliberately local/session-only. It must not race
+        // roster mutations or reintroduce cleaned voter metadata remotely.
+        this.voters = this.storage.replaceVoters(this.voters);
+        const overlay = document.getElementById('loginOverlay');
+        if (overlay) overlay.style.display = 'none';
+        const logout = document.getElementById('logoutBtn');
+        if (logout) logout.style.display = '';
+        this._applyRoleVisibility();
+        this.showStatus(`Signed in as ${membership.name}.`, 'success');
+        this.evaluationPanel.buildGrid();
+        return true;
+    }
+
+    _removeLegacyStudentAccounts() {
+        // Previous releases stored plaintext passwords locally. Automatic
+        // conversion would require holding those secrets during remote writes,
+        // so this migration removes them and requires a one-time new password.
+        try {
+            localStorage.getItem('studentAccounts');
+        } catch (e) {
+            // Removal still runs in finally when storage reads are blocked.
+        } finally {
+            try { localStorage.removeItem('studentAccounts'); } catch (e) {}
+        }
     }
 
     async _freshSync() {
@@ -254,17 +418,8 @@ class App {
                 this.storage.remote.loadVotersResult(),
                 this.storage.remote.loadGroupsResult()
             ]);
-            if (evals.available) {
-                localStorage.setItem('pbEvals', JSON.stringify(evals.data));
-                this.evaluations.fromJSON(evals.data);
-            }
-            if (voters.available) {
-                this.voters = this.storage.replaceVoters(voters.data);
-            }
-            if (groups.available && groups.data.length > 0) {
-                localStorage.setItem('pbGroups', JSON.stringify(groups.data));
-                this.groups.fromJSON(groups.data);
-                this.groupPanel.buildList();
+            if (evals.available && voters.available && groups.available) {
+                this._applyFullState({ available: true, data: { groups: groups.data, evaluations: evals.data, voters: voters.data } });
             }
         } catch (e) {}
     }
@@ -288,9 +443,8 @@ class App {
         // Completion remains in EvaluationCollection. Replacing the roster strips
         // legacy hasVoted/rated* fields from app state, cache, and local storage.
         this.voters = this.storage.replaceVoters(source);
-        if (persistRemote && this.storage.remote && typeof this.storage.remote.saveVoters === 'function') {
-            this.storage.remote.saveVoters(this.voters);
-        }
+        // Voter presence is local/session metadata. Never write it back from a
+        // possibly stale client, because roster transactions own remote voters.
         return this.voters;
     }
 
@@ -309,12 +463,75 @@ class App {
         return true;
     }
 
+    _applyFullState(remoteState, { source = 'sync' } = {}) {
+        if (!remoteState || !remoteState.available || !remoteState.data) return false;
+        const state = remoteState.data;
+        if (!Array.isArray(state.groups) || !Array.isArray(state.voters)
+            || !state.evaluations || typeof state.evaluations !== 'object' || Array.isArray(state.evaluations)) return false;
+
+        if (this.storage && typeof this.storage.applyRemoteState === 'function') {
+            if (!this.storage.applyRemoteState(state)) return false;
+            this.voters = this.storage.loadVoters();
+        } else {
+            localStorage.setItem('pbGroups', JSON.stringify(state.groups));
+            localStorage.setItem('pbEvals', JSON.stringify(state.evaluations));
+            this.voters = Array.isArray(state.voters) ? state.voters.map(voter => ({ ...voter })) : [];
+        }
+        this.groups.fromJSON(state.groups);
+        this.evaluations.fromJSON(state.evaluations);
+        this.rosterRevision = Number.isSafeInteger(state.rosterRevision) && state.rosterRevision >= 0 ? state.rosterRevision : 0;
+        this._stateVersion = (this._stateVersion || 0) + 1;
+
+        if (this.groupPanel && typeof this.groupPanel.resetState === 'function') this.groupPanel.resetState();
+        if (this.evaluationPanel && typeof this.evaluationPanel.resetState === 'function') this.evaluationPanel.resetState();
+        if (this.groupNavigator && typeof this.groupNavigator.resetState === 'function') this.groupNavigator.resetState();
+
+        if (!this.isTeacher && this.currentVoter) {
+            const membership = this._resolveStudentMembership(this.currentVoter);
+            if (!membership) this._endInvalidStudentSession();
+            else {
+                this.currentVoter = membership.name;
+                this.voterGroupIndex = membership.groupIndex;
+            }
+        }
+
+        if (this.groupPanel && typeof this.groupPanel.buildList === 'function') this.groupPanel.buildList();
+        if (this.evaluationPanel && typeof this.evaluationPanel.buildGrid === 'function') this.evaluationPanel.buildGrid();
+        if (this.dashboardPanel && typeof this.dashboardPanel.render === 'function') this.dashboardPanel.render();
+        if (typeof this._renderVoters === 'function') this._renderVoters();
+        if (this.resultsPanel && typeof this.resultsPanel.showPasswordPrompt === 'function') this.resultsPanel.showPasswordPrompt();
+        return true;
+    }
+
+    _endInvalidStudentSession() {
+        this._studentLoginName = null;
+        this.currentVoter = null;
+        this.voterGroupIndex = null;
+        this.isTeacher = false;
+        localStorage.removeItem('rubricLoggedInUser');
+        localStorage.removeItem('rubricDeviceName');
+        const logout = document.getElementById('logoutBtn');
+        if (logout) logout.style.display = 'none';
+        const overlay = document.getElementById('loginOverlay');
+        if (overlay) overlay.style.display = 'flex';
+        if (typeof this._showRolePicker === 'function') this._showRolePicker();
+    }
+
     async _startEvaluationSync() {
         if (this._evaluationUnsubscribe || !this.storage || !this.storage.remote
-            || typeof this.storage.remote.subscribeEvaluations !== 'function') return;
+            || (typeof this.storage.remote.subscribeState !== 'function'
+                && typeof this.storage.remote.subscribeEvaluations !== 'function')) return;
         try {
-            const unsubscribe = await this.storage.remote.subscribeEvaluations(remoteEvals => {
-                App.prototype._applyRemoteEvaluations.call(this, remoteEvals, { rebuildStudent: true });
+            const subscribe = this.storage.remote.subscribeState || this.storage.remote.subscribeEvaluations;
+            const unsubscribe = await subscribe.call(this.storage.remote, remoteState => {
+                if (remoteState && remoteState.data && Array.isArray(remoteState.data.groups)
+                    && Array.isArray(remoteState.data.voters)) {
+                    App.prototype._applyFullState.call(this, remoteState, { source: 'listener' });
+                } else if (remoteState && remoteState.state) {
+                    App.prototype._applyFullState.call(this, { available: remoteState.available, data: remoteState.state }, { source: 'listener' });
+                } else {
+                    App.prototype._applyRemoteEvaluations.call(this, remoteState, { rebuildStudent: true });
+                }
             });
             if (typeof unsubscribe === 'function') this._evaluationUnsubscribe = unsubscribe;
         } catch (e) {}
@@ -325,14 +542,21 @@ class App {
             const tabId = tab.dataset.tab;
             if (this.isTeacher) {
                 tab.style.display = '';
+                tab.hidden = false;
             } else {
                 if (tabId === 'evaluate') {
                     tab.style.display = '';
+                    tab.hidden = false;
                 } else {
                     tab.style.display = 'none';
+                    tab.hidden = true;
                 }
             }
         });
+        const roleContext = document.getElementById('roleContext');
+        if (roleContext) roleContext.textContent = this.isTeacher
+            ? 'Teacher workspace · roster, results, and reporting'
+            : `Student workspace · evaluating as ${this.currentVoter || 'student'}`;
         if (this.isTeacher) {
             this.tabManager.switch('dashboard');
         } else {
@@ -349,65 +573,29 @@ class App {
 
         const savedEvals = this.storage.loadEvaluations();
         if (savedEvals) this.evaluations.fromJSON(savedEvals);
-
-        this._ensureDefaultMembers();
     }
 
-    _ensureDefaultMembers() {
-        for (let i = 0; i <= 8; i++) {
-            if (!this.groups.get(i)) {
-                this.groups.add({ name: `Group ${i + 1}`, members: '' });
-            }
+    async _ensureInitialGroups() {
+        if (!this.storage || typeof this.storage.ensureInitialGroups !== 'function') return false;
+        const result = await this.storage.ensureInitialGroups(this._defaultGroups());
+        if (result && result.ok && result.state) {
+            this._applyFullState({ available: true, data: result.state }, { source: 'seed' });
         }
-        const addMember = (groupIndex, name) => {
-            const g = this.groups.get(groupIndex);
-            if (!g) return false;
-            const members = g.members ? g.members.split('\n').map(m => m.trim()).filter(m => m) : [];
-            if (!members.includes(name)) {
-                members.push(name);
-                g.members = members.join('\n');
-                return true;
-            }
-            return false;
-        };
+        return !!(result && result.ok);
+    }
 
-        let changed = false;
-
-        changed |= addMember(0, 'Nathaniel Rodrigo');
-        changed |= addMember(0, 'Junna Dag-uman');
-        changed |= addMember(0, 'Merry Jay Tumulak');
-
-        changed |= addMember(1, 'Krizia Nicole Rubio');
-        changed |= addMember(1, 'Althea Tanguamos');
-        changed |= addMember(1, 'John Alrey Gementiza');
-
-        changed |= addMember(2, 'Aranas Vince');
-        changed |= addMember(2, 'Palangan Lucille Mae');
-        changed |= addMember(2, 'Tariao Justine Jean');
-
-        changed |= addMember(3, 'Kevin Jay Morales');
-        changed |= addMember(3, 'Nylvia Apao');
-        changed |= addMember(3, 'Rosalden Rabago');
-
-        changed |= addMember(4, 'James Susas');
-        changed |= addMember(4, 'Mark Antolijao');
-        changed |= addMember(4, 'Eirich Dianne Molde');
-
-        changed |= addMember(5, 'Bal Gestly Labador');
-        changed |= addMember(5, 'Elmie Soltes');
-        changed |= addMember(5, 'Steven Yoldan');
-
-        changed |= addMember(6, 'Andrew Sambulan');
-        changed |= addMember(6, 'Allan Baguio');
-        changed |= addMember(6, 'Archie Jutag');
-
-        changed |= addMember(7, 'Angel Lou Geografo');
-        changed |= addMember(7, 'Juliemar Bartolo');
-        changed |= addMember(7, 'Gabriel Salaveria');
-
-        changed |= addMember(8, 'April Gulbin');
-
-        if (changed) this.storage.saveGroups(this.groups.toJSON());
+    _defaultGroups() {
+        return [
+            { name: 'Group 1', members: 'Nathaniel Rodrigo\nJunna Dag-uman\nMerry Jay Tumulak' },
+            { name: 'Group 2', members: 'Krizia Nicole Rubio\nAlthea Tanguamos\nJohn Alrey Gementiza' },
+            { name: 'Group 3', members: 'Aranas Vince\nPalangan Lucille Mae\nTariao Justine Jean' },
+            { name: 'Group 4', members: 'Kevin Jay Morales\nNylvia Apao\nRosalden Rabago' },
+            { name: 'Group 5', members: 'James Susas\nMark Antolijao\nEirich Dianne Molde' },
+            { name: 'Group 6', members: 'Bal Gestly Labador\nElmie Soltes\nSteven Yoldan' },
+            { name: 'Group 7', members: 'Andrew Sambulan\nAllan Baguio\nArchie Jutag' },
+            { name: 'Group 8', members: 'Angel Lou Geografo\nJuliemar Bartolo\nGabriel Salaveria' },
+            { name: 'Group 9', members: 'April Gulbin' }
+        ];
     }
 
     _isNameInMemberList(name) {
@@ -415,51 +603,21 @@ class App {
     }
 
     _resolveStudentMembership(name) {
+        if (typeof FirebaseService !== 'undefined') return FirebaseService.resolveUniqueRosterMember(this.groups.getAll(), name);
         if (!EvaluationKey.isIdentity(name)) return null;
-        const nameLower = name.toLowerCase();
+        let key;
+        try { key = name.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US'); } catch (e) { return null; }
         const matches = [];
-        for (let i = 0; i < this.groups.size(); i++) {
-            const members = this.groups.getMemberList(i);
-            for (const member of members) {
-                if (member.toLowerCase() === nameLower) matches.push({ name: member, groupIndex: i });
-            }
+        for (let index = 0; index < this.groups.size(); index++) {
+            this.groups.getMemberList(index).forEach(member => {
+                try {
+                    if (member.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US') === key) {
+                        matches.push({ name: member, groupIndex: index });
+                    }
+                } catch (e) {}
+            });
         }
         return matches.length === 1 ? matches[0] : null;
-    }
-
-    _getStudentAccounts() {
-        let stored;
-        try { stored = JSON.parse(localStorage.getItem('studentAccounts') || '[]'); } catch { stored = []; }
-        const entries = Array.isArray(stored)
-            ? stored
-            : (stored && typeof stored === 'object' ? Object.entries(stored) : []);
-        const accounts = new Map();
-        entries.forEach(entry => {
-            if (!Array.isArray(entry) || entry.length !== 2) return;
-            const [name, password] = entry;
-            if (EvaluationKey.isIdentity(name) && typeof password === 'string') accounts.set(name, password);
-        });
-        return accounts;
-    }
-
-    _saveStudentAccounts(accounts) {
-        localStorage.setItem('studentAccounts', JSON.stringify([...accounts.entries()]));
-    }
-
-    _hasStudentPassword(name) {
-        const accounts = this._getStudentAccounts();
-        return accounts.has(name.toLowerCase().trim());
-    }
-
-    _saveStudentPassword(name, password) {
-        const accounts = this._getStudentAccounts();
-        accounts.set(name.toLowerCase().trim(), password);
-        this._saveStudentAccounts(accounts);
-    }
-
-    _checkStudentPassword(name, password) {
-        const accounts = this._getStudentAccounts();
-        return accounts.get(name.toLowerCase().trim()) === password;
     }
 
     _findVoterGroupIndex(name) {
@@ -525,11 +683,11 @@ class App {
         });
         const allNames = [...votersMap.keys()].sort();
         if (allNames.length === 0) {
-            container.innerHTML = '<div class="empty-state"><p>No votes recorded yet.</p></div>';
+            container.innerHTML = '<div class="empty-state"><p>No votes recorded yet. Evaluation activity will appear here as students submit votes.</p></div>';
             return;
         }
         const totalGroups = this.groups.size();
-        let html = '<div style="overflow-x:auto;"><table class="results-table"><tr><th>#</th><th>Name</th><th>Groups Rated</th><th>Members Rated</th><th>Status</th></tr>';
+        let html = '<div class="table-scroll" role="region" aria-label="Voter status table" tabindex="0"><table class="results-table"><thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Groups rated</th><th scope="col">Members rated</th><th scope="col">Status</th></tr></thead><tbody>';
         allNames.forEach((name, i) => {
             const v = votersMap.get(name);
             const totalVotes = v.groupCount + v.memberCount;
@@ -543,7 +701,7 @@ class App {
                 <td><span class="grade-badge ${statusClass}">${statusText}</span></td>
             </tr>`;
         });
-        html += '</table></div>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
     }
 
@@ -576,7 +734,7 @@ class App {
 
         document.getElementById('clearAllBtn').addEventListener('click', () => {
             Promise.resolve().then(() => this.resultsPanel.clearAll()).catch(() => {
-                alert('Could not clear results. Please try again.');
+                if (typeof this.showStatus !== 'function' || !this.showStatus('Could not clear results. Please try again.', 'error')) alert('Could not clear results. Please try again.');
             });
         });
         document.getElementById('exportAllBtn').addEventListener('click', () => this.resultsPanel.exportCSV());

@@ -73,7 +73,7 @@ async function runTests() {
     assert.deepEqual(JSON.parse(values.get('pbVoters')), [{ name: 'Alice' }]);
     assert.deepEqual(rosterApp.voters, [{ name: 'Alice' }]);
     assert.deepEqual(storage._votersCache, [{ name: 'Alice' }]);
-    assert.deepEqual(savedVoters, [{ name: 'Alice' }]);
+    assert.equal(savedVoters, null, 'local voter/session cleanup does not overwrite a newer remote roster');
 
     values.set('pbEvals', JSON.stringify(original));
     const enabledStorage = new StorageService();

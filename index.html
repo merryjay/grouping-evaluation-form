@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Rubric Eval">
@@ -555,81 +555,45 @@
             .results-table th, .results-table td { padding: 14px 12px; }
         }
     </style>
+    <link rel="stylesheet" href="css/workspace.css?v=20260727-workspace-ui">
 </head>
 <body>
 <div class="bg-overlay"></div>
 
-<div id="loginOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);">
-  <div id="loginRolePicker" style="background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-    <div style="font-size:40px;margin-bottom:10px;">&#128203;</div>
-    <h2 style="margin:0 0 6px;color:#1e293b;">Group Evaluation</h2>
-    <p style="font-size:13px;color:#64748b;margin-bottom:24px;">Who are you?</p>
-    <p style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px;margin:-8px 0 16px;">Student passwords are stored only in this browser. The teacher passcode is embedded in this static app as a client-side UI convenience. Neither protects shared Firestore data or establishes ownership.</p>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <button id="chooseStudentBtn" onclick="var a=window.app;if(a&&a._showNameInput)a._showNameInput();else showStudentLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(102,126,234,0.4);">I'm a Student</button>
-      <button id="chooseTeacherBtn" onclick="var a=window.app;if(a&&a._showTeacherPw)a._showTeacherPw();else showTeacherLogin()" style="width:100%;padding:18px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);">I'm a Teacher</button>
-    </div>
-  </div>
-
-  <div id="loginNameInput" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-    <h2 style="margin:0 0 6px;color:#1e293b;">Student Evaluation</h2>
-    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your name, then use the browser-local password prompt.</p>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <input type="text" id="voterNameInput" placeholder="Your full name" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
-      <div id="studentPwArea" style="display:none;flex-direction:column;gap:8px;">
-        <input type="password" id="studentPassword" placeholder="Password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
-        <input type="password" id="studentConfirmPw" placeholder="Confirm password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._studentLogin)a._studentLogin()}">
-      </div>
-      <button id="voterLoginBtn" onclick="var a=window.app;if(a&&a._studentLogin)a._studentLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
-    </div>
-    <p id="loginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Please enter your name.</p>
-    <p id="studentPwError" style="color:#e74c3c;font-size:12px;margin-top:6px;display:none;"></p>
-    <div style="margin-top:12px;">
-      <button id="backToRolePickerBtn" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
-    </div>
-  </div>
-
-  <div id="loginTeacherPw" style="display:none;background:white;border-radius:20px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-    <h2 style="margin:0 0 6px;color:#1e293b;">Teacher Access</h2>
-    <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter the client-side teacher passcode to view the dashboard.</p>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <input type="password" id="teacherPasswordInput" placeholder="Teacher password" style="width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:500;outline:none;text-align:center;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){event.preventDefault();var a=window.app;if(a&&a._teacherLogin)a._teacherLogin()}">
-      <button id="teacherLoginBtn" onclick="var a=window.app;if(a&&a._teacherLogin)a._teacherLogin()" style="width:100%;padding:14px 24px;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Enter</button>
-    </div>
-    <p id="teacherLoginError" style="color:#e74c3c;font-size:12px;margin-top:10px;display:none;">Incorrect password.</p>
-    <div style="margin-top:12px;">
-      <button id="backToRolePickerBtn2" onclick="var a=window.app;if(a&&a._showRolePicker)a._showRolePicker();else showElem('loginRolePicker',true);showElem('loginNameInput',false);showElem('loginTeacherPw',false)" style="background:none;border:none;color:#667eea;font-size:12px;cursor:pointer;font-weight:600;">&larr; Back</button>
-    </div>
-  </div>
+<div id="loginOverlay" class="login-overlay" role="dialog" aria-modal="true" aria-labelledby="loginDialogTitle" aria-describedby="loginDisclosure" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <section id="loginRolePicker" class="login-panel"><div class="login-mark" aria-hidden="true">GE</div><h2 id="loginDialogTitle">Group evaluation</h2><p>Choose the workspace that matches your role.</p><p id="loginDisclosure" class="login-disclosure">Student password verifiers are stored in public Firestore so passwords work across devices. This is a functional gate only: public rules do not provide ownership or authorization. The teacher passcode is embedded in this static client JavaScript and provides no security boundary.</p><div class="login-actions"><button type="button" id="chooseStudentBtn" class="btn btn-primary">Continue as student</button><button type="button" id="chooseTeacherBtn" class="btn btn-secondary">Continue as teacher</button></div></section>
+  <section id="loginNameInput" class="login-panel" style="display:none;" aria-labelledby="studentLoginTitle"><div class="login-mark" aria-hidden="true">ST</div><h2 id="studentLoginTitle">Student evaluation</h2><p id="studentLoginInstructions">First, check your roster name. Then create or enter your cross-device password.</p><label for="voterNameInput">Roster name</label><input type="text" id="voterNameInput" placeholder="Your full name" autocomplete="name" aria-describedby="studentLoginInstructions loginError studentAccountState" autofocus><p id="studentAccountState" class="account-state" aria-live="polite"></p><div id="studentPwArea" style="display:none;flex-direction:column;gap:8px;"><label for="studentPassword">Password</label><input type="password" id="studentPassword" placeholder="Password" autocomplete="current-password" aria-describedby="studentPwError"><label id="studentConfirmPwLabel" for="studentConfirmPw" style="display:none;">Confirm password</label><input type="password" id="studentConfirmPw" placeholder="Confirm password" autocomplete="new-password" aria-describedby="studentPwError" style="display:none;"></div><div class="login-actions" style="margin-top:16px;"><button type="button" id="voterLoginBtn" class="btn btn-primary">Check name</button></div><p id="loginError" class="login-error" role="alert">Please enter your name.</p><p id="studentPwError" class="login-error" role="alert"></p><button type="button" id="backToRolePickerBtn" class="back-btn">Back to role selection</button></section>
+  <section id="loginTeacherPw" class="login-panel" style="display:none;" aria-labelledby="teacherLoginTitle"><div class="login-mark" aria-hidden="true">TE</div><h2 id="teacherLoginTitle">Teacher access</h2><p>Enter the client-side teacher passcode to view the dashboard.</p><label for="teacherPasswordInput">Teacher passcode</label><input type="password" id="teacherPasswordInput" placeholder="Teacher passcode" autocomplete="current-password" aria-describedby="teacherLoginError"><div class="login-actions" style="margin-top:16px;"><button type="button" id="teacherLoginBtn" class="btn btn-primary">Open teacher workspace</button></div><p id="teacherLoginError" class="login-error" role="alert">Incorrect password.</p><button type="button" id="backToRolePickerBtn2" class="back-btn">Back to role selection</button></section>
 </div>
 
 <div class="container">
-    <header>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div style="text-align:left;">
-                <h1 style="font-size:24px;margin:0;">GROUPINGS EVALUATION FORM</h1>
-                <p style="font-size:12px;margin:4px 0 0;opacity:0.8;">Rate groups on multiple criteria with automatic score computation</p>
-            </div>
-            <button id="logoutBtn" onclick="var a=window.app;if(a&&a._doLogout)a._doLogout()" style="padding:6px 12px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;display:none;position:relative;z-index:2;">Logout</button>
+    <div id="appStatus" class="status-region" role="status" aria-live="polite" aria-atomic="true"></div>
+    <header class="workspace-header">
+        <div>
+            <h1>GROUPINGS EVALUATION FORM</h1>
+            <p>Rate groups with a shared rubric and automatic score computation.</p>
+            <span id="roleContext" class="role-context">Choose a role to begin</span>
         </div>
+        <button type="button" id="logoutBtn" class="logout-btn" aria-label="Log out of the evaluation workspace" style="display:none;">Log out</button>
     </header>
 
-    <div class="tabs">
-        <button class="tab active" data-tab="dashboard">Dashboard</button>
-        <button class="tab" data-tab="setup">Rubric Setup</button>
-        <button class="tab" data-tab="groups">Groups</button>
-        <button class="tab" data-tab="evaluate">Evaluate</button>
-        <button class="tab" data-tab="voters">Voters</button>
-        <button class="tab" data-tab="results">Results</button>
-    </div>
+    <nav class="tabs" aria-label="Evaluation workspace sections" role="tablist">
+        <button type="button" class="tab active" id="tab-button-dashboard" data-tab="dashboard" role="tab" aria-selected="true" aria-controls="tab-dashboard">Dashboard</button>
+        <button type="button" class="tab" id="tab-button-setup" data-tab="setup" role="tab" aria-selected="false" aria-controls="tab-setup" tabindex="-1">Rubric setup</button>
+        <button type="button" class="tab" id="tab-button-groups" data-tab="groups" role="tab" aria-selected="false" aria-controls="tab-groups" tabindex="-1">Groups</button>
+        <button type="button" class="tab" id="tab-button-evaluate" data-tab="evaluate" role="tab" aria-selected="false" aria-controls="tab-evaluate" tabindex="-1">Evaluate</button>
+        <button type="button" class="tab" id="tab-button-voters" data-tab="voters" role="tab" aria-selected="false" aria-controls="tab-voters" tabindex="-1">Voters</button>
+        <button type="button" class="tab" id="tab-button-results" data-tab="results" role="tab" aria-selected="false" aria-controls="tab-results" tabindex="-1">Results</button>
+    </nav>
+    <main id="workspaceMain">
 
     <!-- DASHBOARD TAB -->
-    <div id="tab-dashboard" class="tab-content">
+    <section id="tab-dashboard" class="tab-content" role="tabpanel" aria-labelledby="tab-button-dashboard" tabindex="0">
         <div id="dashboardContent"></div>
-    </div>
+    </section>
 
     <!-- SETUP TAB -->
-    <div id="tab-setup" class="tab-content">
+    <section id="tab-setup" class="tab-content" role="tabpanel" aria-labelledby="tab-button-setup" tabindex="0">
         <div class="card" style="padding:16px;">
             <h2 style="margin:0 0 12px; border:none; padding:0; font-size:15px;">Rubric Configuration</h2>
 
@@ -648,7 +612,8 @@
                 </div>
             </div>
 
-            <h2 style="margin-top:10px; font-size:14px;">Criteria & Descriptors</h2>
+            <h2 style="margin-top:8px; font-size:18px;">Criteria & Descriptors</h2>
+            <p id="rubricWeightStatus" class="weight-status" role="status" aria-live="polite"></p>
             <div id="criteriaList">
                 <div class="criteria-row" data-index="0" style="margin-bottom:6px;">
                     <div class="form-group">
@@ -659,7 +624,7 @@
                         <label>Weight (%)</label>
                         <input type="number" class="criteria-weight" value="10" min="0" max="100">
                     </div>
-                    <button class="remove-criteria" title="Remove">&times;</button>
+                    <button type="button" class="remove-criteria" title="Remove criterion" aria-label="Remove Content Accuracy criterion">Remove</button>
                 </div>
                 <div class="criteria-row" data-index="1">
                     <div class="form-group">
@@ -773,38 +738,40 @@
         <div class="card">
             <h2>Rubric Matrix Preview</h2>
             <div class="scroll-hint">Swipe horizontally to see all columns</div>
-            <div id="rubricPreview" style="overflow-x: auto; -webkit-overflow-scrolling: touch;"></div>
+            <div id="rubricPreview" class="table-scroll" role="region" aria-label="Rubric matrix preview" tabindex="0"></div>
         </div>
-    </div>
+    </section>
 
     <!-- GROUPS TAB -->
-    <div id="tab-groups" class="tab-content">
+    <section id="tab-groups" class="tab-content" role="tabpanel" aria-labelledby="tab-button-groups" tabindex="0">
         <div class="card">
             <h2>Group Configuration</h2>
-            <p style="font-size:12px; color:#666; margin-bottom:15px;">Click a group to see its members. Use the add/delete buttons to manage groups.</p>
-            <div id="groupsListReadOnly"></div>
+            <p style="font-size:13px; color:#666; margin-bottom:16px;">Open a group to review its members. Changes are saved to the shared roster.</p>
+            <p id="groupsStatus" class="weight-status" role="status" aria-live="polite"></p>
+            <div id="groupsListReadOnly" aria-live="polite"></div>
             <div class="btn-group" style="margin-top:15px;">
                 <button class="btn btn-primary" id="addGroupBtn">+ Add Group</button>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- EVALUATE TAB -->
-    <div id="tab-evaluate" class="tab-content">
+    <section id="tab-evaluate" class="tab-content" role="tabpanel" aria-labelledby="tab-button-evaluate" tabindex="0">
         <div class="card">
             <h2 id="evaluationTitle">Group Evaluation</h2>
-            <p style="font-size:12px; color:#666; margin-bottom:15px;">Rate each group using the rubric. Click the score buttons to rate.</p>
+            <p style="font-size:13px; color:#666; margin-bottom:16px;">Rate each group using the rubric. Click the score buttons to rate.</p>
             <div class="scroll-hint">Scroll horizontally to see all criteria</div>
         </div>
+        <p id="evaluationStatus" class="weight-status" role="status" aria-live="polite"></p>
         <div id="groupsEvaluationGrid" class="groups-grid"></div>
 
-    </div>
+    </section>
 
     <!-- RESULTS TAB -->
-    <div id="tab-results" class="tab-content">
+    <section id="tab-results" class="tab-content" role="tabpanel" aria-labelledby="tab-button-results" tabindex="0">
         <div class="card">
             <h2>Evaluation Results</h2>
-            <div id="resultsContent">
+            <div id="resultsContent" aria-live="polite">
                 <div class="empty-state">
                     <p>No evaluations yet. Go to the Evaluate tab to rate groups.</p>
                 </div>
@@ -817,40 +784,42 @@
         </div>
 
         <div class="btn-group">
-            <button class="btn btn-danger" id="clearAllBtn">Clear All Results</button>
+            <button class="btn btn-danger" id="clearAllBtn">Clear all evaluations</button>
             <button class="btn btn-secondary" id="exportAllBtn">Export All to CSV</button>
         </div>
-    </div>
+    </section>
 
     <!-- VOTERS TAB -->
-    <div id="tab-voters" class="tab-content">
+    <section id="tab-voters" class="tab-content" role="tabpanel" aria-labelledby="tab-button-voters" tabindex="0">
         <div class="card">
             <h2>Voter Status</h2>
-            <div id="votersList">
+            <div id="votersList" aria-live="polite">
                 <div class="empty-state"><p>No voters yet.</p></div>
             </div>
         </div>
-    </div>
+    </section>
+    </main>
 </div>
 
-<script src="js/services/EvaluationKey.js?v=20260726-completion-reset-cache"></script>
-<script src="js/models/RubricConfig.js?v=20260726-completion-reset-cache"></script>
-<script src="js/models/GroupCollection.js?v=20260726-completion-reset-cache"></script>
-<script src="js/models/EvaluationCollection.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/FirebaseConfig.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/FirebaseService.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/SafeHtml.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/StorageService.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/AuthService.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/ScoringService.js?v=20260726-completion-reset-cache"></script>
-<script src="js/services/ExportService.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/TabManager.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/GroupNavigator.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/DashboardPanel.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/SetupPanel.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/GroupPanel.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/EvaluationPanel.js?v=20260726-completion-reset-cache"></script>
-<script src="js/ui/ResultsPanel.js?v=20260726-completion-reset-cache"></script>
+<script src="js/services/EvaluationKey.js?v=20260727-workspace-ui"></script>
+<script src="js/models/RubricConfig.js?v=20260727-workspace-ui"></script>
+<script src="js/models/GroupCollection.js?v=20260727-workspace-ui"></script>
+<script src="js/models/EvaluationCollection.js?v=20260727-workspace-ui"></script>
+<script src="js/services/FirebaseConfig.js?v=20260727-workspace-ui"></script>
+<script src="js/services/StudentCredentialService.js?v=20260727-workspace-ui"></script>
+<script src="js/services/FirebaseService.js?v=20260727-workspace-ui"></script>
+<script src="js/services/SafeHtml.js?v=20260727-workspace-ui"></script>
+<script src="js/services/StorageService.js?v=20260727-workspace-ui"></script>
+<script src="js/services/AuthService.js?v=20260727-workspace-ui"></script>
+<script src="js/services/ScoringService.js?v=20260727-workspace-ui"></script>
+<script src="js/services/ExportService.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/TabManager.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/GroupNavigator.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/DashboardPanel.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/SetupPanel.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/GroupPanel.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/EvaluationPanel.js?v=20260727-workspace-ui"></script>
+<script src="js/ui/ResultsPanel.js?v=20260727-workspace-ui"></script>
 <script>
 function showStudentLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', true); showElem('loginTeacherPw', false); var inp = document.getElementById('voterNameInput'); if(inp) inp.focus(); }
 function showTeacherLogin() { showElem('loginRolePicker', false); showElem('loginNameInput', false); showElem('loginTeacherPw', true); var inp = document.getElementById('teacherPasswordInput'); if(inp) inp.focus(); }
@@ -893,7 +862,7 @@ function logoutUser() {
     if (app) app.tabManager.switch('setup');
 }
 </script>
-<script src="js/app.js?v=20260726-completion-reset-cache"></script>
+<script src="js/app.js?v=20260727-workspace-ui"></script>
 
 </body>
 </html>

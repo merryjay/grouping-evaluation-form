@@ -32,11 +32,10 @@ class DashboardPanel {
                 const bestGroup = this.app.groups.get(best.groupIndex);
                 const bestName = bestGroup ? bestGroup.name : `Group ${best.groupIndex + 1}`;
 
-                html += `<div class="card" style="border-left:5px solid #f59e0b;background:linear-gradient(135deg,#fffbeb,#fef3c7);">
+                html += `<div class="card" style="border-left:4px solid #4f5fc7;">
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="font-size:40px;">&#127942;</div>
                         <div>
-                            <h2 style="margin:0;border:none;padding:0;font-size:20px;color:#92400e;">Best Group</h2>
+                            <h2 style="margin:0;border:none;padding:0;font-size:20px;">Leading group</h2>
                             <p style="font-size:16px;font-weight:700;color:#1e293b;margin-top:4px;">${safe(bestName)}</p>
                             <p style="font-size:13px;color:#64748b;">Weighted: ${safe(best.totalWeighted)}% &middot; Raw: ${safe(best.totalRaw)} &middot; ${safe(best.scoreCount)} vote${best.scoreCount !== 1 ? 's' : ''}</p>
                         </div>
@@ -49,11 +48,10 @@ class DashboardPanel {
                 const bestMemberGroup = this.app.groups.get(bestMember.groupIndex);
                 const memberGroupName = bestMemberGroup ? bestMemberGroup.name : `Group ${bestMember.groupIndex + 1}`;
 
-                html += `<div class="card" style="border-left:5px solid #10b981;background:linear-gradient(135deg,#ecfdf5,#d1fae5);">
+                html += `<div class="card" style="border-left:4px solid #167a57;">
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="font-size:40px;">&#127942;</div>
                         <div>
-                            <h2 style="margin:0;border:none;padding:0;font-size:20px;color:#065f46;">Best Individual</h2>
+                            <h2 style="margin:0;border:none;padding:0;font-size:20px;">Leading individual</h2>
                             <p style="font-size:16px;font-weight:700;color:#1e293b;margin-top:4px;">${safe(bestMember.memberName)} (${safe(memberGroupName)})</p>
                             <p style="font-size:13px;color:#64748b;">Weighted: ${safe(bestMember.totalWeighted)}% &middot; Raw: ${safe(bestMember.totalRaw)} &middot; ${safe(bestMember.scoreCount)} vote${bestMember.scoreCount !== 1 ? 's' : ''}</p>
                         </div>
@@ -64,16 +62,15 @@ class DashboardPanel {
             if (groupAggregated.length > 0) {
                 html += `<div class="card">
                     <h2>Group Rankings</h2>
-                    <div style="overflow-x:auto;">
+                    <div class="table-scroll" role="region" aria-label="Group rankings" tabindex="0">
                     <table class="results-table">
                         <tr><th>#</th><th>Group</th><th>Avg Raw</th><th>Weighted %</th><th>Votes</th></tr>`;
                 groupAggregated.forEach((r, i) => {
                     const group = this.app.groups.get(r.groupIndex);
                     const groupName = group ? group.name : `Group ${r.groupIndex + 1}`;
                     const rankClass = i < 3 ? `rank-${i + 1}` : '';
-                    const medal = i === 0 ? '&#129351;' : i === 1 ? '&#129352;' : i === 2 ? '&#129353;' : '';
                     html += `<tr class="${rankClass}">
-                        <td>${medal || (i + 1)}</td>
+                        <td>${i + 1}</td>
                         <td><strong>${safe(groupName)}</strong></td>
                         <td>${safe(r.totalRaw)}</td>
                         <td>${safe(r.totalWeighted)}%</td>
@@ -86,17 +83,16 @@ class DashboardPanel {
             if (memberAggregated.length > 0) {
                 html += `<div class="card">
                     <h2>Individual Rankings</h2>
-                    <div style="overflow-x:auto;">
+                    <div class="table-scroll" role="region" aria-label="Individual rankings" tabindex="0">
                     <table class="results-table">
                         <tr><th>#</th><th>Name</th><th>Group</th><th>Weighted %</th><th>Grade</th><th>Votes</th></tr>`;
                 memberAggregated.forEach((r, i) => {
                     const group = this.app.groups.get(r.groupIndex);
                     const groupName = group ? group.name : `Group ${r.groupIndex + 1}`;
                     const rankClass = i < 3 ? `rank-${i + 1}` : '';
-                    const medal = i === 0 ? '&#129351;' : i === 1 ? '&#129352;' : i === 2 ? '&#129353;' : '';
                     const grade = this.app.scoring ? this.app.scoring.getGrade(r.totalWeighted) : '';
                     html += `<tr class="${rankClass}">
-                        <td>${medal || (i + 1)}</td>
+                        <td>${i + 1}</td>
                         <td><strong>${safe(r.memberName)}</strong></td>
                         <td>${safe(groupName)}</td>
                         <td>${safe(r.totalWeighted)}%</td>
@@ -111,7 +107,7 @@ class DashboardPanel {
             const labels = rubric ? rubric.getScoreLabels() : [];
             html += `<div class="card">
                 <h2>Criteria Evaluation Table</h2>
-                <div style="overflow-x:auto;">
+                <div class="table-scroll" role="region" aria-label="Criteria evaluation table" tabindex="0">
                 <table class="rubric-table">
                     <tr><th>Criteria</th>`;
             for (let s = rubric.maxScore; s >= 1; s--) {
@@ -136,7 +132,7 @@ class DashboardPanel {
             }
             html += `</table></div></div>`;
         } else {
-            html += `<div class="card"><div class="empty-state"><p>No evaluations yet. Students need to vote first.</p></div></div>`;
+            html += `<div class="card"><div class="empty-state"><p>No evaluations yet.</p><p>Results and participation trends will appear after students submit votes.</p></div></div>`;
         }
 
         const votersMap = new Map();
@@ -153,7 +149,7 @@ class DashboardPanel {
 
         html += `<div class="card">
             <h2>Voter Status</h2>
-            <div style="overflow-x:auto;">
+            <div class="table-scroll" role="region" aria-label="Voter status" tabindex="0">
             <table class="results-table">
                 <tr><th>#</th><th>Name</th><th>Groups Rated</th><th>Members Rated</th><th>Status</th></tr>`;
         const allNames = [...votersMap.keys()].sort();

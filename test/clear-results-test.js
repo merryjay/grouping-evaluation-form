@@ -62,12 +62,28 @@ function panelWith(method, succeeds) {
     panel.setStorage({
         [method]: async (...args) => {
             calls.push(args);
-            return succeeds;
+            if (method === 'clearAllEvaluations') return succeeds;
+            if (!succeeds) return { ok: false, error: 'transaction-failed' };
+            const next = { ...original };
+            if (method === 'deleteGroupEvaluationsResult') delete next['g:0:Alice'];
+            if (method === 'deleteMemberEvaluationsResult') delete next['m:0:Bob:Alice'];
+            return {
+                ok: true,
+                state: {
+                    schemaVersion: 2,
+                    rosterInitialized: true,
+                    rosterRevision: 0,
+                    groups: [{ name: 'Group One', members: 'Alice\nBob' }],
+                    voters: [],
+                    evaluations: next
+                }
+            };
         }
     });
     panel.render = () => { renders++; };
     context.window.app = {
         mutationCount: 0,
+        rosterRevision: 0,
         _markResultsMutation() { this.mutationCount++; }
     };
     return { panel, evaluations, calls, get renders() { return renders; } };
@@ -107,24 +123,24 @@ async function runTests() {
     assert.equal(await storage.deleteMemberEvaluations(0, 'Bob', { memberCleared: true }), true);
     assert.equal(values.get('pbEvals'), JSON.stringify({ memberCleared: true }));
 
-    let test = panelWith('deleteGroupEvaluations', false);
+    let test = panelWith('deleteGroupEvaluationsResult', false);
     await test.panel._deleteEvaluation(0);
     assert.equal(test.evaluations.size(), 2);
     assert.equal(test.renders, 0);
     assert.equal(alerts.pop(), 'Could not clear results. Please try again.');
-    test = panelWith('deleteGroupEvaluations', true);
+    test = panelWith('deleteGroupEvaluationsResult', true);
     await test.panel._deleteEvaluation(0);
     assert.equal(test.evaluations.size(), 1);
     assert.equal(test.calls.length, 1);
     assert.equal(test.renders, 1);
     assert.equal(context.window.app.mutationCount, 1);
 
-    test = panelWith('deleteMemberEvaluations', false);
+    test = panelWith('deleteMemberEvaluationsResult', false);
     await test.panel._deleteMemberEvaluation(0, 'Bob');
     assert.equal(test.evaluations.size(), 2);
     assert.equal(test.renders, 0);
     assert.equal(alerts.pop(), 'Could not clear results. Please try again.');
-    test = panelWith('deleteMemberEvaluations', true);
+    test = panelWith('deleteMemberEvaluationsResult', true);
     await test.panel._deleteMemberEvaluation(0, 'Bob');
     assert.equal(test.evaluations.size(), 1);
     assert.equal(test.calls.length, 1);

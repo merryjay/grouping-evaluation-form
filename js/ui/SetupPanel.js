@@ -4,13 +4,15 @@ class SetupPanel {
         this.rubric = rubricConfig;
         this.storage = storageService;
         this.tabManager = tabManager;
+        this._criteriaSequence = 0;
 
         this.el = {
             criteriaList: document.getElementById('criteriaList'),
             setupButtons: document.getElementById('setupButtons'),
             maxScore: document.getElementById('maxScore'),
             activityName: document.getElementById('activityName'),
-            rubricPreview: document.getElementById('rubricPreview')
+            rubricPreview: document.getElementById('rubricPreview'),
+            weightStatus: document.getElementById('rubricWeightStatus')
         };
 
         this._bindEvents();
@@ -45,23 +47,24 @@ class SetupPanel {
     _rebuildCriteriaRows() {
         this.el.criteriaList.innerHTML = '';
         this.rubric.criteria.forEach((c, i) => {
-            this.el.criteriaList.appendChild(this._createCriteriaRow(c.name, c.weight));
+            this.el.criteriaList.appendChild(this._createCriteriaRow(c.name, c.weight, i));
         });
+        this._criteriaSequence = this.rubric.criteria.length;
     }
 
-    _createCriteriaRow(name, weight) {
+    _createCriteriaRow(name, weight, index = this._criteriaSequence++) {
         const div = document.createElement('div');
         div.className = 'criteria-row';
         div.innerHTML = `
             <div class="form-group">
-                <label>Criterion Name</label>
-                <input type="text" class="criteria-name-input" value="${this._escapeHtml(name)}">
+                <label for="criterion-name-${index}">Criterion name</label>
+                <input id="criterion-name-${index}" type="text" class="criteria-name-input" value="${this._escapeHtml(name)}">
             </div>
             <div class="form-group">
-                <label>Weight (%)</label>
-                <input type="number" class="criteria-weight" value="${this._escapeHtml(weight)}" min="0" max="100">
+                <label for="criterion-weight-${index}">Weight (%)</label>
+                <input id="criterion-weight-${index}" type="number" class="criteria-weight" value="${this._escapeHtml(weight)}" min="0" max="100">
             </div>
-            <button class="remove-criteria" title="Remove">&times;</button>
+            <button type="button" class="remove-criteria" title="Remove criterion" aria-label="Remove ${this._escapeHtml(name || 'new')} criterion">Remove</button>
         `;
         return div;
     }
@@ -78,7 +81,7 @@ class SetupPanel {
     _removeCriteria(btn) {
         const rows = this.el.criteriaList.querySelectorAll('.criteria-row');
         if (rows.length <= 1) {
-            alert('You need at least one criterion.');
+            this._announce('You need at least one criterion.', 'warning');
             return;
         }
         btn.closest('.criteria-row').remove();
@@ -99,35 +102,36 @@ class SetupPanel {
     updatePreview() {
         const maxScore = parseInt(this.el.maxScore.value);
         const criteria = this._gatherCriteriaFromUI();
+        this._renderWeightStatus(criteria);
         if (!criteria.length) {
             this.el.rubricPreview.innerHTML = '<div class="empty-state"><p>Add criteria to see the rubric preview.</p></div>';
             return;
         }
 
         const labels = this.rubric.getScoreLabels();
-        let html = `<div style="overflow-x:auto;"><table class="rubric-table">
-            <tr><th>Criteria</th>`;
+        let html = `<div class="table-scroll" role="region" aria-label="Rubric matrix preview" tabindex="0"><table class="rubric-table"><thead>
+            <tr><th scope="col">Criteria</th>`;
         for (let s = maxScore; s >= 1; s--) {
             html += `<th>${labels[s - 1]} (${s})</th>`;
         }
-        html += `<th>Score</th></tr>`;
+        html += `<th scope="col">Weight</th></tr></thead><tbody>`;
 
         criteria.forEach(c => {
             html += `<tr><td class="criteria-name">${this._escapeHtml(c.name)}</td>`;
             for (let s = maxScore; s >= 1; s--) {
                 const desc = this.rubric.getDescriptor(c.name, s);
-                html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : desc}</td>`;
+                html += `<td class="descriptor">${desc === `Score level ${s}` ? '&mdash;' : this._escapeHtml(desc)}</td>`;
             }
             html += `<td>${this._escapeHtml(c.weight)}%</td></tr>`;
         });
-        html += `</table></div>`;
+        html += `</tbody></table></div>`;
         this.el.rubricPreview.innerHTML = html;
     }
 
     saveRubric() {
         const criteria = this._gatherCriteriaFromUI();
         if (criteria.length === 0) {
-            alert('Please add at least one criterion.');
+            this._announce('Please add at least one criterion.', 'error');
             return;
         }
 
@@ -141,7 +145,25 @@ class SetupPanel {
         this.rubric.activityName = this.el.activityName.value;
 
         this.storage.saveRubric(this.rubric.toJSON());
-        alert('Rubric saved! Now set up your groups.');
+        this._announce('Rubric saved. You can now review your groups.', 'success');
         this.tabManager.switch('groups');
+    }
+
+    _renderWeightStatus(criteria) {
+        if (!this.el.weightStatus) return;
+        const totalWeight = criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
+        const valid = Math.abs(totalWeight - 100) <= 0.1;
+        this.el.weightStatus.textContent = valid
+            ? 'Weights total 100%.'
+            : `Weights total ${totalWeight}%. A saved rubric should total 100%.`;
+        this.el.weightStatus.className = `weight-status ${valid ? 'is-valid' : 'is-invalid'}`;
+    }
+
+    _announce(message, type = 'info') {
+        if (window.app && typeof window.app.showStatus === 'function') {
+            window.app.showStatus(message, type);
+        } else {
+            alert(message);
+        }
     }
 }

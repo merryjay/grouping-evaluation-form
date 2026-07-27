@@ -30,12 +30,7 @@ for (const name of ['__proto__', 'constructor']) {
 }
 assert.equal(EvaluationKey.isIdentity('Valid Member'), true);
 
-const accounts = App.prototype._getStudentAccounts.call({});
-assert.equal(typeof accounts.get, 'function');
-assert.equal(accounts.has('__proto__'), false);
-assert.equal(accounts.has('constructor'), false);
-assert.equal(accounts.get('alice'), 'good');
-assert.equal(App.prototype._hasStudentPassword.call({ _getStudentAccounts: App.prototype._getStudentAccounts }, '__proto__'), false);
+assert.doesNotMatch(fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8'), /_getStudentAccounts|_saveStudentPassword|_checkStudentPassword/);
 
 const group = { name: 'Group 1', members: 'Valid Member' };
 let saveCalls = 0;

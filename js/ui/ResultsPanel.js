@@ -19,9 +19,9 @@ class ResultsPanel {
     render(freshEvals = null) {
         const evals = freshEvals || this.evaluations;
 
-        const toggleHtml = `<div style="display:flex; gap:8px; margin-bottom:16px; background:#f1f5f9; border-radius:12px; padding:4px;">
-            <button class="results-mode-btn" data-mode="group" style="flex:1; padding:10px 16px; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; ${this.mode === 'group' ? 'background:white; color:#667eea; box-shadow:0 2px 8px rgba(0,0,0,0.1);' : 'background:transparent; color:#64748b;'}">Group Results</button>
-            <button class="results-mode-btn" data-mode="member" style="flex:1; padding:10px 16px; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; ${this.mode === 'member' ? 'background:white; color:#667eea; box-shadow:0 2px 8px rgba(0,0,0,0.1);' : 'background:transparent; color:#64748b;'}">Individual Results</button>
+        const toggleHtml = `<div class="segmented-control" role="group" aria-label="Results view">
+            <button type="button" class="results-mode-btn segment-btn" data-mode="group" aria-pressed="${this.mode === 'group'}">Group results</button>
+            <button type="button" class="results-mode-btn segment-btn" data-mode="member" aria-pressed="${this.mode === 'member'}">Individual results</button>
         </div>`;
 
         if (this.mode === 'member') {
@@ -44,7 +44,7 @@ class ResultsPanel {
         const allEntries = evals.getAllEntries();
 
         if (aggregated.length === 0) {
-            this.el.resultsContent.innerHTML = toggleHtml + '<div class="empty-state"><p>No evaluations yet.</p></div>';
+            this.el.resultsContent.innerHTML = toggleHtml + '<div class="empty-state"><p>No group votes yet.</p><p>Submitted group evaluations will appear here.</p></div>';
             this.el.classStats.innerHTML = '';
             return;
         }
@@ -52,9 +52,9 @@ class ResultsPanel {
         aggregated.sort((a, b) => b.totalWeighted - a.totalWeighted);
 
         let html = toggleHtml;
-        html += `<div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        html += `<div class="table-scroll" role="region" aria-label="Group evaluation results" tabindex="0">
             <table class="results-table">
-            <tr><th>#</th><th>Group</th><th>Total Raw</th><th>Final Weighted %</th><th>Voters</th><th>Actions</th></tr>`;
+            <thead><tr><th scope="col">#</th><th scope="col">Group</th><th scope="col">Total raw</th><th scope="col">Final weighted %</th><th scope="col">Voters</th><th scope="col">Actions</th></tr></thead><tbody>`;
 
         aggregated.forEach((r, i) => {
             const rankClass = i < 3 ? `rank-${i + 1}` : '';
@@ -67,8 +67,8 @@ class ResultsPanel {
                 <td>${safe(r.totalWeighted)}%</td>
                 <td>${safe(r.scoreCount)}</td>
                 <td>
-                    <button class="btn btn-sm toggle-stats-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
-                    <button class="btn btn-danger delete-eval-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
+                    <button type="button" class="btn btn-sm toggle-stats-btn" data-result-index="${i}" aria-expanded="false" aria-controls="stats-row-${i}">Show statistics</button>
+                    <button type="button" class="btn btn-danger delete-eval-btn" data-result-index="${i}">Clear group votes</button>
                 </td>
             </tr>`;
             html += `<tr id="stats-row-${i}" style="display:none;"><td colspan="6" style="padding:12px;background:#f8fafc;">
@@ -78,14 +78,14 @@ class ResultsPanel {
             for (const [crit, avg] of Object.entries(r.scores)) {
                 const critConfig = rubric ? rubric.criteria.find(c => c.name === crit) : null;
                 const weight = critConfig ? critConfig.weight : '';
-                html += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
+                html += `<div style="background:#fcfcfd;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">
                     <div style="font-size:11px;color:#64748b;">${safe(crit)}${weight ? ` (${safe(weight)}%)` : ''}</div>
-                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${safe(avg)}</div>
+                    <div style="font-size:15px;font-weight:700;color:#1e293b;">${safe(avg)}</div>
                 </div>`;
             }
             html += `</div></td></tr>`;
         });
-        html += `</table></div>`;
+        html += `</tbody></table></div>`;
         this.el.resultsContent.innerHTML = html;
 
         this.el.resultsContent.querySelectorAll('.toggle-stats-btn').forEach(btn => {
@@ -95,7 +95,8 @@ class ResultsPanel {
                 if (row) {
                     const isVisible = row.style.display !== 'none';
                     row.style.display = isVisible ? 'none' : 'table-row';
-                    btn.textContent = isVisible ? 'Stats' : 'Hide';
+                    btn.textContent = isVisible ? 'Show statistics' : 'Hide statistics';
+                    btn.setAttribute('aria-expanded', isVisible ? 'false' : 'true');
                 }
             });
         });
@@ -115,7 +116,7 @@ class ResultsPanel {
         const allMembers = evals.getAggregatedByMember();
 
         if (allMembers.length === 0) {
-            this.el.resultsContent.innerHTML = toggleHtml + '<div class="empty-state"><p>No individual evaluations yet.</p></div>';
+            this.el.resultsContent.innerHTML = toggleHtml + '<div class="empty-state"><p>No individual votes yet.</p><p>Submitted individual evaluations will appear here.</p></div>';
             this.el.classStats.innerHTML = '';
             return;
         }
@@ -123,9 +124,9 @@ class ResultsPanel {
         allMembers.sort((a, b) => b.totalWeighted - a.totalWeighted);
 
         let html = toggleHtml;
-        html += `<div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        html += `<div class="table-scroll" role="region" aria-label="Individual evaluation results" tabindex="0">
             <table class="results-table">
-            <tr><th>#</th><th>Name</th><th>Group</th><th>Final Weighted %</th><th>Grade</th><th>Voters</th><th>Actions</th></tr>`;
+            <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Group</th><th scope="col">Final weighted %</th><th scope="col">Grade</th><th scope="col">Voters</th><th scope="col">Actions</th></tr></thead><tbody>`;
 
         allMembers.forEach((r, i) => {
             const rankClass = i < 3 ? `rank-${i + 1}` : '';
@@ -140,8 +141,8 @@ class ResultsPanel {
                 <td><span class="grade-badge">${safe(grade)}</span></td>
                 <td>${safe(r.scoreCount)}</td>
                 <td>
-                    <button class="btn btn-sm toggle-member-stats-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto;margin-right:4px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Stats</button>
-                    <button class="btn btn-danger delete-member-btn" data-result-index="${i}" style="padding:4px 8px;font-size:10px;width:auto">Clear</button>
+                    <button type="button" class="btn btn-sm toggle-member-stats-btn" data-result-index="${i}" aria-expanded="false" aria-controls="member-stats-row-${i}">Show statistics</button>
+                    <button type="button" class="btn btn-danger delete-member-btn" data-result-index="${i}">Clear individual votes</button>
                 </td>
             </tr>`;
             html += `<tr id="member-stats-row-${i}" style="display:none;"><td colspan="7" style="padding:12px;background:#f8fafc;">
@@ -151,14 +152,14 @@ class ResultsPanel {
             for (const [crit, avg] of Object.entries(r.scores)) {
                 const critConfig = rubric ? rubric.criteria.find(c => c.name === crit) : null;
                 const weight = critConfig ? critConfig.weight : '';
-                html += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
+                html += `<div style="background:#fcfcfd;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">
                     <div style="font-size:11px;color:#64748b;">${safe(crit)}${weight ? ` (${safe(weight)}%)` : ''}</div>
-                    <div style="font-size:14px;font-weight:700;color:#1e293b;">${safe(avg)}</div>
+                    <div style="font-size:15px;font-weight:700;color:#1e293b;">${safe(avg)}</div>
                 </div>`;
             }
             html += `</div></td></tr>`;
         });
-        html += `</table></div>`;
+        html += `</tbody></table></div>`;
         this.el.resultsContent.innerHTML = html;
 
         this.el.resultsContent.querySelectorAll('.toggle-member-stats-btn').forEach(btn => {
@@ -168,7 +169,8 @@ class ResultsPanel {
                 if (row) {
                     const isVisible = row.style.display !== 'none';
                     row.style.display = isVisible ? 'none' : 'table-row';
-                    btn.textContent = isVisible ? 'Stats' : 'Hide';
+                    btn.textContent = isVisible ? 'Show statistics' : 'Hide statistics';
+                    btn.setAttribute('aria-expanded', isVisible ? 'false' : 'true');
                 }
             });
         });
@@ -219,24 +221,33 @@ class ResultsPanel {
 
     async _deleteEvaluation(groupIndex) {
         const group = this.groups.get(groupIndex);
-        if (!confirm(`Clear ALL group votes for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
-        const updated = this._updatedEvaluations(evaluations => evaluations.deleteGroup(groupIndex));
-        const cleared = await this.storage.deleteGroupEvaluations(groupIndex, updated.toJSON());
-        if (!cleared) return this._showClearError();
-        this.evaluations.fromJSON(updated.toJSON());
+        if (!confirm(`Clear all group votes for ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
+        const result = await this.storage.deleteGroupEvaluationsResult(
+            groupIndex,
+            null,
+            this._groupSnapshot(groupIndex),
+            this._rosterRevision()
+        );
+        if (!this._applyGuardedDeleteResult(result)) return;
         this._recordResultsMutation();
         this.render();
+        this._announce('Group votes cleared.', 'success');
     }
 
     async _deleteMemberEvaluation(groupIndex, memberName) {
         const group = this.groups.get(groupIndex);
-        if (!confirm(`Clear ALL votes for ${memberName} in ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
-        const updated = this._updatedEvaluations(evaluations => evaluations.deleteMember(groupIndex, memberName));
-        const cleared = await this.storage.deleteMemberEvaluations(groupIndex, memberName, updated.toJSON());
-        if (!cleared) return this._showClearError();
-        this.evaluations.fromJSON(updated.toJSON());
+        if (!confirm(`Clear all individual votes for ${memberName} in ${group ? group.name : `Group ${groupIndex + 1}`}?`)) return;
+        const result = await this.storage.deleteMemberEvaluationsResult(
+            groupIndex,
+            memberName,
+            null,
+            this._groupSnapshot(groupIndex),
+            this._rosterRevision()
+        );
+        if (!this._applyGuardedDeleteResult(result)) return;
         this._recordResultsMutation();
         this.render();
+        this._announce('Individual votes cleared.', 'success');
     }
 
     setStorage(storage) {
@@ -244,12 +255,13 @@ class ResultsPanel {
     }
 
     async clearAll() {
-        if (!confirm('Clear ALL evaluations? This cannot be undone.')) return;
+        if (!confirm('Clear all group and individual evaluations? This cannot be undone.')) return;
         const cleared = await this.storage.clearAllEvaluations();
         if (!cleared) return this._showClearError();
         this.evaluations.clearAll();
         this._recordResultsMutation();
         this.render();
+        this._announce('All evaluations cleared.', 'success');
     }
 
     _updatedEvaluations(update) {
@@ -268,14 +280,43 @@ class ResultsPanel {
     }
 
     _showClearError() {
-        alert('Could not clear results. Please try again.');
+        this._announce('Could not clear results. Please try again.', 'error');
+    }
+
+    _groupSnapshot(groupIndex) {
+        const group = this.groups.get(groupIndex);
+        return group ? { name: group.name, members: group.members } : null;
+    }
+
+    _rosterRevision() {
+        return window.app && Number.isSafeInteger(window.app.rosterRevision)
+            ? window.app.rosterRevision
+            : (this.storage && typeof this.storage.getRosterRevision === 'function' ? this.storage.getRosterRevision() : 0);
+    }
+
+    _applyGuardedDeleteResult(result) {
+        if (result && result.state && window.app && typeof window.app._applyFullState === 'function') {
+            window.app._applyFullState({ available: true, data: result.state }, { source: 'results-delete' });
+        } else if (result && result.ok && result.state) {
+            this.evaluations.fromJSON(result.state.evaluations);
+        }
+        if (result && result.ok) return true;
+        this._announce(result && (result.error === 'stale-roster-revision' || result.error === 'stale-group-index')
+            ? 'The roster changed on another device. The latest state was loaded; please retry.'
+            : 'Could not clear results. Please try again.', 'error');
+        return false;
     }
 
     exportCSV() {
         if (this.evaluations.size() === 0) {
-            alert('No data to export.');
+            this._announce('There is no evaluation data to export yet.', 'warning');
             return;
         }
         this.exportService.download();
+    }
+
+    _announce(message, type = 'info') {
+        if (window.app && typeof window.app.showStatus === 'function') window.app.showStatus(message, type);
+        else if (typeof alert === 'function') alert(message);
     }
 }
